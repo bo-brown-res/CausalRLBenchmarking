@@ -1,38 +1,59 @@
-import d3rlpy
-# import d4rl
-# from d3rlpy.datasets import get_cartpole # CartPole-v0 dataset
-# from d3rlpy.datasets import get_pendulum # Pendulum-v0 dataset
-# from d3rlpy.datasets import get_atari    # Atari 2600 task datasets
-# from d3rlpy.datasets import get_d4rl     # D4RL datasets
-from d3rlpy.algos.qlearning.dqn import DQN, DQNConfig
-from d3rlpy.metrics import TDErrorEvaluator
-import pickle
+import argparse
+# import d3rlpy
+# # import d4rl
+# # from d3rlpy.datasets import get_cartpole # CartPole-v0 dataset
+# # from d3rlpy.datasets import get_pendulum # Pendulum-v0 dataset
+# # from d3rlpy.datasets import get_atari    # Atari 2600 task datasets
+# # from d3rlpy.datasets import get_d4rl     # D4RL datasets
+# from d3rlpy.algos.qlearning.dqn import DQN, DQNConfig
+# from d3rlpy.metrics import TDErrorEvaluator
+# import pickle
+# import numpy as np
+# import pandas as pd
+# from torch.optim import Adam
+import random
 import numpy as np
-import pandas as pd
-from torch.optim import Adam
+import torch
 
-from fitting.fit_rl_model import setup_and_run_rl
-from methods.make_datasets import select_dataset
+from dataloading.make_datasets import select_dataset
+from fitting.setup_rl import setup_and_run_rl
+
+def set_random_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
 
 def main():
-    argparser = d3rlpy.cli.create_argument_parser()
+    argparser = argparse.ArgumentParser(description='Run RL or Causal method on dataset')
+    argparser.add_argument(
+        '--method_name', type=str, required=True,
+        help='Name of the method to run. Options: policy_iteration, causal_dqn, soft_actor_critic, proximal_rl, causal_forest, tarnet, dragonnet, CRN, T4, gtransformer'
+    )
+    argparser.add_argument(
+        '--dataset_name', type=str, default='mimic4_hourly',
+        help='Name of the dataset to use. Options: mimic4_hourly'
+    )
     args = argparser.parse_args()
 
+    set_random_seed(123)
 
     working_methods = {
         #rl-based methods
-        'policy_iteration':  ['RL', xxx],
-        'causal_dqn':        ['RL', xxx],
-        'soft_actor_critic': ['RL', xxx],
-        'proximal_rl': ['RL', xxx],
+        'policy_iteration':  ['RL', None],
+        'causal_dqn':        ['RL', None],
+        'soft_actor_critic': ['RL', None],
+        'proximal_rl': ['RL', None],
 
         #causal-based methods
-        'causal_forest': ['CS', xxx],
-        'tarnet': ['CS', xxx],
-        'dragonnet': ['CS', xxx],
-        'CRN': ['CS', xxx],
-        'T4': ['CS', xxx],
-        'gtransformer': ['CS', xxx],
+        'causal_forest': ['CS', None],
+        'tarnet': ['CS', None],
+        'dragonnet': ['CS', None],
+        'CRN': ['CS', None],
+        'T4': ['CS', None],
+        'gtransformer': ['CS', None],
     }
 
     m_name = args.method_name
@@ -43,17 +64,40 @@ def main():
         raise ValueError(f"Unknown method name: {m_name}")
     
     #get the data
-    train_dataset, val_dataset, test_dataset = select_dataset(ds_name='mimic4_hourly', val_size=0.1, test_size=0.2)
+    train_dataset, val_dataset, test_dataset = select_dataset(
+        ds_name='mimic4_hourly', 
+        val_size=0.1, 
+        test_size=0.2,
+        subsample_frac=0.1 #TODO: remove when algos working
+        )
+
+    #define the training config
+    train_config = {
+        'device': 'cuda:0',
+        'batch_size': 512,
+        'learning_rate': 1e-3,
+        'discount_factor': 0.99,
+        'n_critics': 2,
+        'alpha': 0.1,
+        'mask_size': 10,
+        'n_steps': 3000,
+        'n_steps_per_epoch': 1000,
+        'initial_temperature': 0.1,
+    }
+
 
     if method_type == 'RL':
         setup_and_run_rl(
-            method_type=m_name,
+            method_name=m_name,
+            train_config=train_config,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             test_dataset=test_dataset,
         )
     elif method_type == 'CS':
         setup_and_run_cs(
+            method_name=m_name,
+            train_config=train_config,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             test_dataset=test_dataset,

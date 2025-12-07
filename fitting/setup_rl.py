@@ -6,6 +6,7 @@ from evaluate.custom_evaluators import TrueValueErrorEvaluator
 
 def setup_and_run_rl(
     method_name,
+    train_config,
     train_dataset,
     val_dataset,
     test_dataset,
@@ -35,21 +36,30 @@ def setup_and_run_rl(
                 error_type='mae',
                 episodes=test_dataset.episodes
             ),
-    },
+    }
 
     if method_name == 'causal_dqn':
-        from fitting.specific_fits.rl_CausalDQN import run_causal_dqn_fit
+        from fitting.rl_CausalDQN import run_causal_dqn_fit
         fitted_algo = run_causal_dqn_fit(
-            train_dataset,
-            val_dataset,
-            test_dataset,
-            observation_scaler,
-            reward_scaler,
-            action_scaler,
-            optim_factory,
-            shared_evalautor_dict,
+            train_config=train_config,
+            train_dataset=train_dataset,
+            observation_scaler=observation_scaler,
+            reward_scaler=reward_scaler,
+            action_scaler=action_scaler,
+            optim_factory=optim_factory,
+            shared_evalautor_dict=shared_evalautor_dict,
         )
-
+    elif method_name == 'soft_actor_critic':
+        from fitting.rl_CausalDQN import run_SAC_fit
+        fitted_algo = run_SAC_fit(
+            train_config=train_config,
+            train_dataset=train_dataset,
+            observation_scaler=observation_scaler,
+            reward_scaler=reward_scaler,
+            action_scaler=action_scaler,
+            optim_factory=optim_factory,
+            shared_evalautor_dict=shared_evalautor_dict,
+        )
     else:
         raise ValueError(f"Unknown method name: {method_name}")
     

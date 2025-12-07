@@ -6,7 +6,7 @@ import d3rlpy
 import numpy as np
 
 
-def get_data_items(data_object):
+def get_data_items(data_object, subsample_frac=None):
     observations = data_object['states']
     actions = data_object['actions']
     rewards = data_object['rewards']
@@ -15,13 +15,23 @@ def get_data_items(data_object):
     colnames = data_object['colnames']
     threshold_hours = data_object['threshold_hours']
 
+    if subsample_frac is not None:
+        n_episodes = len(observations)
+        subsample_size = int(n_episodes * subsample_frac)
+        selected_indices = np.random.choice(n_episodes, subsample_size, replace=False)
+
+        observations = [observations[i] for i in selected_indices]
+        actions = [actions[i] for i in selected_indices]
+        rewards = [rewards[i] for i in selected_indices]
+        terminals = [terminals[i] for i in selected_indices]
+
     return observations, actions, rewards, terminals, actionmap, colnames, threshold_hours
 
 
-def select_dataset(ds_name, val_size=0.1, test_size=0.2):
+def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None):
     if ds_name == "mimic4_hourly":
         mimic4_hourly_data = pickle.load(open("/mnt/d/research/rl_causal/notebooks/mimic4_hourly_datapackage.pkl", "rb"))
-        obs, acts, rwds, terms, amap, cnames, thhrs = get_data_items(mimic4_hourly_data)
+        obs, acts, rwds, terms, amap, cnames, thhrs = get_data_items(mimic4_hourly_data, subsample_frac=subsample_frac)
     else:
         raise ValueError(f"Dataset {ds_name} not recognized.")
     
