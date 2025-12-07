@@ -16,6 +16,7 @@ import numpy as np
 import torch
 
 from dataloading.make_datasets import select_dataset
+from fitting.fit_causal_model import setup_and_run_cs
 from fitting.setup_rl import setup_and_run_rl
 
 def set_random_seed(seed):
@@ -45,7 +46,7 @@ def main():
         'policy_iteration':  ['RL', None],
         'causal_dqn':        ['RL', None],
         'soft_actor_critic': ['RL', None],
-        'proximal_rl': ['RL', None],
+        # 'proximal_rl': ['RL', None],
 
         #causal-based methods
         'causal_forest': ['CS', None],
@@ -62,14 +63,6 @@ def main():
         method_type, run_method_function = working_methods[m_name]
     else:
         raise ValueError(f"Unknown method name: {m_name}")
-    
-    #get the data
-    train_dataset, val_dataset, test_dataset = select_dataset(
-        ds_name='mimic4_hourly', 
-        val_size=0.1, 
-        test_size=0.2,
-        subsample_frac=0.1 #TODO: remove when algos working
-        )
 
     #define the training config
     train_config = {
@@ -83,8 +76,18 @@ def main():
         'n_steps': 3000,
         'n_steps_per_epoch': 1000,
         'initial_temperature': 0.1,
+        'lambda_alpha': 1.0,
     }
 
+    #load dataset
+    train_dataset, val_dataset, test_dataset = select_dataset(
+        ds_name='mimic4_hourly', 
+        val_size=0.1, 
+        test_size=0.2,
+        subsample_frac=0.1, #TODO: remove when algos working
+        fmt=method_type,
+        train_config=train_config
+    )
 
     if method_type == 'RL':
         setup_and_run_rl(
@@ -93,6 +96,7 @@ def main():
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             test_dataset=test_dataset,
+            fmt='CS'
         )
     elif method_type == 'CS':
         setup_and_run_cs(
