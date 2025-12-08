@@ -41,20 +41,24 @@ def main():
 
     set_random_seed(123)
 
+    valid_datasets = [
+        "mimic4_hourly",
+        "epicare_len12_acts4ep_10000",
+    ]
+
     working_methods = {
-        #rl-based methods
+    #rl-based methods
         'policy_iteration':  ['RL', None],
         'causal_dqn':        ['RL', None],
         'soft_actor_critic': ['RL', None],
         # 'proximal_rl': ['RL', None],
-
-        #causal-based methods
-        'causal_forest': ['CS', None],
+    #causal-based methods
+        # 'causal_forest': ['CS', None],
         'tarnet': ['CS', None],
         'dragonnet': ['CS', None],
         'CRN': ['CS', None],
-        'T4': ['CS', None],
-        'gtransformer': ['CS', None],
+        # 'T4': ['CS', None],
+        # 'gtransformer': ['CS', None],
     }
 
     m_name = args.method_name
@@ -67,7 +71,8 @@ def main():
     #define the training config
     train_config = {
         'device': 'cuda:0',
-        'batch_size': 512,
+        # 'batch_size': 512,
+        'batch_size': 128,
         'learning_rate': 1e-3,
         'discount_factor': 0.99,
         'n_critics': 2,
@@ -78,16 +83,17 @@ def main():
         'initial_temperature': 0.1,
         'lambda_alpha': 1.0,
         'max_seq_len': 24*7,
-        'rnn_hidden_units': 256,
-        'fc_hidden_units': 128
+        #CRN params
+        'rnn_hidden_units': 128, #256,
+        'fc_hidden_units': 64, # 128
     }
 
     #load dataset
     train_dataset, val_dataset, test_dataset = select_dataset(
-        ds_name='mimic4_hourly', 
+        ds_name=args.dataset_name, 
         val_size=0.1, 
         test_size=0.2,
-        subsample_frac=0.1, #TODO: remove when algos working
+        # subsample_frac=0.1, #TODO: remove when algos working
         fmt=method_type,
         train_config=train_config
     )
@@ -108,6 +114,7 @@ def main():
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             test_dataset=test_dataset,
+            dataset_name=args.dataset_name
         )
     else:
         raise ValueError(f"Unknown method type: {method_type}")

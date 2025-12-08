@@ -51,7 +51,22 @@ class CRN(nn.Module):
             nn.Linear(fc_hidden_units, num_treatments)
         )
 
-    def forward(self, covariates, prev_treatments, current_treatments, alpha=1.0):
+    def forward(self, treatments, covariates, lambda_alpha, **kwargs):
+    # def forward(self, covariates, prev_treatments, current_treatments, alpha=1.0):
+    # def crn_forward(model, treatments, covariates, lambda_alpha, **kwargs):
+        batch_size, seq_len, treat_dim = treatments.data.shape
+        zeros = torch.zeros(batch_size, 1, treat_dim).to(treatments.device)
+
+        prev_treatments = torch.cat([zeros, treatments[:, :-1, :]], dim=1)
+
+        # pred_outcomes, pred_treatment_logits = model(
+        #             covariates, 
+        #             prev_treatments, 
+        #             current_treatments=treatments,
+        #             alpha=lambda_alpha
+        #         )
+        # return pred_outcomes, pred_treatment_logits
+
         """
         Args:
             covariates: (Batch, Seq_Len, Dim_Cov)
@@ -70,14 +85,26 @@ class CRN(nn.Module):
         
         # 2. Outcome Prediction (Factual Prediction)
         # We assume the outcome Y_{t+1} depends on History (rnn_output) AND Current Action (A_t)
-        outcome_input = torch.cat([rnn_output, current_treatments], dim=-1)
+        outcome_input = torch.cat([rnn_output, treatments], dim=-1)
         outcome_pred = self.outcome_net(outcome_input)
         
         # 3. Treatment Prediction (Propensity Balancing)
         # Apply Gradient Reversal to the representation before this head
         # If we optimize to minimize treatment loss, the encoder will actually 
         # try to MAXIMIZE it (learn representations that hide treatment info).
-        reversed_rnn_output = GradientReversal.apply(rnn_output, alpha)
+        reversed_rnn_output = GradientReversal.apply(rnn_output, lambda_alpha)
         treatment_pred_logits = self.treatment_net(reversed_rnn_output)
         
         return outcome_pred, treatment_pred_logits
+    
+
+    def predict_treatment_effect(self, treatments, covariates, lambda_alpha, **kwargs):
+        was_training = self.training
+        self.eval() 
+        
+        with torch.no_grad():
+            outcomes_per_t_action, _ = self(treatments, covariates, lambda_alpha, **kwargs)
+            
+        self.train(mode=was_training)
+        
+        return outcomes_per_t_action

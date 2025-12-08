@@ -1,28 +1,20 @@
+import csv
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+import pandas as pd
 
 
-# if __name__ == "__main__":
-#     # Hyperparameters
-#     BATCH_SIZE = 32
-#     SEQ_LEN = 10
-#     NUM_COVARIATES = 5
-#     NUM_TREATMENTS = 2  # e.g., Treat A or Treat B
-#     NUM_OUTPUTS = 1     # e.g., Tumor volume
-#     # Create the model
-#     crn = CRN(NUM_COVARIATES, NUM_TREATMENTS, NUM_OUTPUTS)
-#     # Generate Dummy Data
-#     # In a real scenario, use your own Dataset/DataLoader
-#     mock_covariates = torch.randn(BATCH_SIZE, SEQ_LEN, NUM_COVARIATES)
-#     # One-hot treatments
-#     mock_treatments_idx = torch.randint(0, NUM_TREATMENTS, (BATCH_SIZE, SEQ_LEN))
-#     mock_treatments = F.one_hot(mock_treatments_idx, NUM_TREATMENTS).float()
-#     mock_outcomes = torch.randn(BATCH_SIZE, SEQ_LEN, NUM_OUTPUTS)
-#     # Wrap in a simple list for the loop
-#     mock_dataloader = [(mock_covariates, mock_treatments, mock_outcomes)]
-#     # Train
-#     trained_model = train_crn(crn, mock_dataloader, num_epochs=5)
+def compute_true_ite_error(model, treatments, covariates, true_effects, **kwargs):
+    # actions_taken = treatments
+    val_of_acts_taken = model.predict_treatment_effect(treatments, covariates, **kwargs).squeeze()
+    # true_vals_of_acts_taken = true_effects[]
+    taken_acts_idxs = treatments.argmax(dim=-1)
+    true_vals_of_acts_taken = torch.gather(true_effects, 2, taken_acts_idxs.unsqueeze(-1)).squeeze(-1)
+
+    diff = (true_vals_of_acts_taken - val_of_acts_taken)**2
+    mse = diff.mean()
+    return mse
 
 
 def setup_and_run_cs(
@@ -31,15 +23,17 @@ def setup_and_run_cs(
             train_dataset,
             val_dataset,
             test_dataset,
+            dataset_name,
         ):
 
     kwargs = {
-        'device': train_config.get('device', 'cpu')
+        'device': train_config.get('device', 'cpu'),
+        'ds_name': dataset_name
     }
 
     if method_name == 'CRN':
         from methods.causal_based.CounterfactualRecurrentNetwork import CRN
-        from fitting.specific_fits.causal_CRN import crn_forward, crn_loss
+        from fitting.specific_fits.causal_CRN import crn_loss
         model = CRN(
             num_covariates=train_dataset.dataset[0][0].shape[-1],
             num_treatments=train_dataset.dataset[0][1].shape[-1],
@@ -48,7 +42,6 @@ def setup_and_run_cs(
             fc_hidden_units=train_config.get('fc_hidden_units', 32),
         ).to(train_config.get('device'))
 
-        model_forward_fn = crn_forward
         model_loss_fn = crn_loss
 
         kwargs.update({
@@ -59,14 +52,30 @@ def setup_and_run_cs(
 
     else:
         raise ValueError(f"Unknown causal method name: {method_name}")
+    
+
+    my_metricsfn_dict = {
+        'true_ite_error': compute_true_ite_error
+    }
 
     trained_model = training_loop(
-        model,
-        train_dataset,
-        model_forward_fn,
-        model_loss_fn,
+        model=model,
+        train_dataloader=train_dataset,
+        val_dataloader=val_dataset,
+        model_forward_fn=model.forward,
+        model_loss_fn=model_loss_fn,
         num_epochs=train_config.get('n_steps', 100),
         learning_rate=train_config.get('learning_rate', 0.001),
+        metricsfn_dict=my_metricsfn_dict,
+        **kwargs
+    )
+
+    test_model(
+        model,
+        test_dataloader=test_dataset,
+        model_forward_fn=model.forward,
+        model_loss_fn=model_loss_fn,
+        metricsfn_dict=my_metricsfn_dict,
         **kwargs
     )
 
@@ -74,20 +83,27 @@ def setup_and_run_cs(
 
 
 
-def training_loop(model, dataloader, model_forward_fn, model_loss_fn, num_epochs=100, learning_rate=0.01, **kwargs):
+def training_loop(model, train_dataloader, val_dataloader, model_forward_fn, model_loss_fn, 
+                  num_epochs=100, learning_rate=0.01, csv_path="metrics.csv", earlystop_wait=10,
+                  metricsfn_dict={}, **kwargs):
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    model.train()
     device = kwargs.get('device', 'cpu')
 
-    with open(csv_path, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(["Epoch", "Train_Loss", "Eval_Loss", "Crit1", "Crit2", "Crit3"])
-    
+    best_val_loss = float('inf')
+    epochs_no_improve = 0
+
+    records = []
+
     for epoch in range(num_epochs):
-        total_loss = 0
+        model.train()
+        train_loss_accum = 0.0
+        train_batches = 0
         
-        for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}"):
-            covariates, treatments, rewards, terminations = batch
+        pbar = tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{num_epochs}")
+        
+        for batch in pbar:
+            covariates, treatments, rewards, terminations, true_ites = batch
             covariates = covariates.to(device)
             treatments = treatments.to(device)
             rewards = rewards.to(device)
@@ -97,7 +113,6 @@ def training_loop(model, dataloader, model_forward_fn, model_loss_fn, num_epochs
                 model=model, 
                 treatments=treatments,
                 covariates=covariates, 
-                # lambda_alpha=kwargs.get('lambda_alpha', 1.0)
                 **kwargs
             )
 
@@ -106,37 +121,75 @@ def training_loop(model, dataloader, model_forward_fn, model_loss_fn, num_epochs
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            total_loss += loss.item()
             
-        print(f"Epoch {epoch+1}/{num_epochs} | Loss: {total_loss:.8f}")
+            train_loss_accum += loss.item()
+            train_batches += 1
+            
+            pbar.set_postfix({'train_loss': loss.item()})
 
+        avg_train_loss = train_loss_accum / train_batches if train_batches > 0 else 0
+
+        validation_results = evaluate_dataset(
+            model=model, 
+            dataloader=val_dataloader, 
+            model_forward_fn=model_forward_fn, 
+            model_loss_fn=model_loss_fn, 
+            metricsfn_dict=metricsfn_dict, 
+            **kwargs
+        )
+
+        val_loss = validation_results.get('val_avg_loss', float('inf'))
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+            if epochs_no_improve >= earlystop_wait:
+                print(f"Early stopping triggered at epoch {epoch+1}")
+                break
+        records.append({**{
+            'epoch': epoch+1,
+            'avg_train_loss': avg_train_loss,
+        }, **validation_results})
+
+        pd.DataFrame(records).to_csv(f"training_{model.__class__.__name__}_{kwargs['ds_name']}.csv")
     return model
 
+def test_model(model, test_dataloader, model_forward_fn, model_loss_fn, metricsfn_dict, **kwargs):
+    validation_results = evaluate_dataset(
+        model=model, 
+        dataloader=test_dataloader, 
+        model_forward_fn=model_forward_fn, 
+        model_loss_fn=model_loss_fn, 
+        metricsfn_dict=metricsfn_dict, 
+        testing_tag='test',
+        **kwargs
+    )
+    pd.DataFrame([validation_results]).to_csv(f"testing_{model.__class__.__name__}_{kwargs['ds_name']}.csv")
 
 
-def evaluate_dataset(model, dataloader, model_forward_fn, model_loss_fn, device, **kwargs):
+def evaluate_dataset(model, dataloader, model_forward_fn, model_loss_fn, device, metricsfn_dict, **kwargs):
     """
     Computes loss and metrics for a secondary dataset (Validation or Test).
     """
     model.eval()  # Set model to evaluation mode
+    testing_tag = kwargs.get('testing_tag', 'val')
+    temp_metricsfn_dict = {f"{testing_tag}_{k}":v for k,v in metricsfn_dict.items()}
     
     # Trackers for aggregation
     total_loss = 0.0
-    total_crit1 = 0.0
-    total_crit2 = 0.0
-    total_crit3 = 0.0
+    metrics_results = {name: 0.0 for name in temp_metricsfn_dict.keys()}
     num_batches = 0
     
     # Disable gradient calculation for efficiency
     with torch.no_grad():
         for batch in dataloader:
-            covariates, treatments, rewards, terminations = batch
+            covariates, treatments, rewards, terminations, true_ites = batch
             covariates = covariates.to(device)
             treatments = treatments.to(device)
             rewards = rewards.to(device)
-            # terminations might be needed depending on your metric functions
-            
-            # Forward pass
+            true_ites = true_ites.to(device)
+
             predictions = model_forward_fn(
                 model=model, 
                 treatments=treatments,
@@ -144,24 +197,22 @@ def evaluate_dataset(model, dataloader, model_forward_fn, model_loss_fn, device,
                 **kwargs
             )
 
-            # Compute Main Loss
             loss = model_loss_fn(predictions, rewards, treatments, **kwargs)
             total_loss += loss.item()
             
-            # Compute Custom Metrics
-            # Assuming crit functions signature: fn(predictions, rewards, ...)
-            # Adjust arguments passed to crits as needed for your specific functions
-            total_crit1 += crit1(predictions, rewards).item()
-            total_crit2 += crit2(predictions, rewards).item()
-            total_crit3 += crit3(predictions, rewards).item()
-            
+            for name, m_fn in temp_metricsfn_dict.items():
+                metrics_results[name] += m_fn(model, treatments=treatments, covariates=covariates, true_effects=true_ites, **kwargs).item()
+    
             num_batches += 1
 
-    # Return averages
     if num_batches == 0:
         return 0, 0, 0, 0
         
-    return (total_loss / num_batches, 
-            total_crit1 / num_batches, 
-            total_crit2 / num_batches, 
-            total_crit3 / num_batches)
+    avg_loss = total_loss / num_batches
+    avg_metrics = {name: total / num_batches for name, total in metrics_results.items()}
+    avg_metrics.update({f'{testing_tag}_avg_loss': avg_loss})
+
+    return avg_metrics
+
+
+

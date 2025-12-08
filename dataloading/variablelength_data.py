@@ -3,12 +3,26 @@ from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 
 class VariableLengthDataset(Dataset):
-    def __init__(self, observations, actions, rewards, terminals):
+    def __init__(self, observations, actions, rewards, terminals, true_ites, fmt='3d_r_a'):
+
+        torch_obs = torch.nn.utils.rnn.pad_sequence(observations, batch_first=True)
+        torch_act = torch.nn.utils.rnn.pad_sequence(actions, batch_first=True)
+        torch_rwd = torch.nn.utils.rnn.pad_sequence(rewards, batch_first=True)
+        torch_trm = torch.nn.utils.rnn.pad_sequence(terminals, batch_first=True)
+        torch_ite = torch.nn.utils.rnn.pad_sequence(true_ites, batch_first=True)
+
+        if fmt == '3d_r_a':
+            if torch_act.ndim == 2 or torch_act.shape[-1] == 1:
+                torch_act = torch.nn.functional.one_hot(torch_act.to(torch.long), num_classes=int(torch_act.max())+1) 
+            if torch_rwd.ndim == 2:
+                torch_rwd = torch_rwd.unsqueeze(-1)
+
         self.data = [
-            torch.nn.utils.rnn.pad_sequence(observations, batch_first=True),
-            torch.nn.utils.rnn.pad_sequence(actions, batch_first=True),
-            torch.nn.utils.rnn.pad_sequence(rewards, batch_first=True),
-            torch.nn.utils.rnn.pad_sequence(terminals, batch_first=True),
+            torch_obs,
+            torch_act,
+            torch_rwd,
+            torch_trm,
+            torch_ite,
             # observations,
             # actions,
             # rewards,
@@ -20,12 +34,13 @@ class VariableLengthDataset(Dataset):
         return len(self.data[0])
 
     def __getitem__(self, idx):
-        o = self.data[0][idx]
-        a = self.data[1][idx]
-        r = self.data[2][idx]
-        t = self.data[3][idx]
-        l = self.data[4][idx]
-        return o, a, r, t, l
+        o = self.data[0][idx] #observation/state
+        a = self.data[1][idx] #action
+        r = self.data[2][idx] #reward
+        t = self.data[3][idx] #terminal
+        e = self.data[4][idx] #ites
+        l = self.data[5][idx] #length
+        return o, a, r, t, e, l
     
 
 def pack_collate(batch):
@@ -49,5 +64,6 @@ def pack_collate(batch):
     acts = torch.stack([x[1] for x in batch])
     rwds = torch.stack([x[2] for x in batch])
     term = torch.stack([x[3] for x in batch])
+    ites = torch.stack([x[4] for x in batch])
 
-    return obs, acts, rwds, term
+    return obs, acts, rwds, term, ites

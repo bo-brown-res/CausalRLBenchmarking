@@ -15,9 +15,10 @@ def get_data_items(data_object, subsample_frac=None):
     actions = data_object['actions']
     rewards = data_object['rewards']
     terminals = data_object['terminals']
-    actionmap = data_object['actionmap']
-    colnames = data_object['colnames']
-    threshold_hours = data_object['threshold_hours']
+    actionmap = data_object.get('actionmap', None)
+    colnames = data_object.get('colnames', None)
+    threshold_hours = data_object.get('threshold_hours', None)
+    true_ites = data_object.get('true_ites', None)
 
     if subsample_frac is not None:
         n_episodes = len(observations)
@@ -28,14 +29,19 @@ def get_data_items(data_object, subsample_frac=None):
         actions = [actions[i] for i in selected_indices]
         rewards = [rewards[i] for i in selected_indices]
         terminals = [terminals[i] for i in selected_indices]
+        if true_ites:
+            true_ites = [true_ites[i] for i in selected_indices]
 
-    return observations, actions, rewards, terminals, actionmap, colnames, threshold_hours
+    return observations, actions, rewards, terminals, true_ites, actionmap, colnames, threshold_hours
 
 
 def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fmt='RL', train_config=None):
     if ds_name == "mimic4_hourly":
         mimic4_hourly_data = pickle.load(open("/mnt/d/research/rl_causal/notebooks/mimic4_hourly_datapackage.pkl", "rb"))
-        obs, acts, rwds, terms, amap, cnames, thhrs = get_data_items(mimic4_hourly_data, subsample_frac=subsample_frac)
+        obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(mimic4_hourly_data, subsample_frac=subsample_frac)
+    elif ds_name == "epicare_len12_acts4ep_10000":
+        epicare_len12_acts4ep_10000 = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_len12_acts4ep_10000.pkl", "rb"))
+        obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(epicare_len12_acts4ep_10000, subsample_frac=subsample_frac)
     else:
         raise ValueError(f"Dataset {ds_name} not recognized.")
     
@@ -46,6 +52,7 @@ def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fm
         actions=acts, 
         rewards=rwds, 
         terminals=terms, 
+        true_ites=true_ites,
         test_size=test_size, 
         validation_size=val_size,
         train_config=train_config,
@@ -53,7 +60,7 @@ def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fm
     return train_dataset, val_dataset, test_dataset
 
 
-def build_train_test_datasets(dformat, observations, actions, rewards, terminals, test_size=0.2, validation_size=0.0, train_config=None):
+def build_train_test_datasets(dformat, observations, actions, rewards, terminals, true_ites, test_size=0.2, validation_size=0.0, train_config=None):
     n_episodes = len(observations)
     random_indices = np.random.permutation(n_episodes)
     n_train_episodes = int(n_episodes * (1 - test_size))
@@ -73,12 +80,14 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
             actions=np.concat([actions[i] for i in train_indices],axis=0),
             rewards=np.concat([rewards[i] for i in train_indices],axis=0),
             terminals=np.concat([terminals[i] for i in train_indices],axis=0),
+            true_ites=np.concat([true_ites[i] for i in train_indices],axis=0),
         )
         test_dataset = d3rlpy.dataset.MDPDataset(
             observations=np.concat([observations[i] for i in test_indices],axis=0),
             actions=np.concat([actions[i] for i in test_indices],axis=0),
             rewards=np.concat([rewards[i] for i in test_indices],axis=0),
             terminals=np.concat([terminals[i] for i in test_indices],axis=0),
+            true_ites=np.concat([true_ites[i] for i in test_indices],axis=0),
         )
         val_dataset = None
         if validation_size > 0.0:
@@ -87,6 +96,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                 actions=np.concat([actions[i] for i in val_indices],axis=0),
                 rewards=np.concat([rewards[i] for i in val_indices],axis=0),
                 terminals=np.concat([terminals[i] for i in val_indices],axis=0),
+                true_ites=np.concat([true_ites[i] for i in val_indices],axis=0),
             )
     elif dformat == 'CS':
         max_seq_len = train_config.get('max_seq_len', None)
@@ -101,6 +111,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                                               actions=[torch.from_numpy(actions[i]).to(torch.float32) for i in train_indices],
                                               rewards=[torch.from_numpy(rewards[i]).to(torch.float32) for i in train_indices],
                                               terminals=[torch.from_numpy(terminals[i]).to(torch.float32) for i in train_indices],
+                                              true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in train_indices],
                                               )
         train_dataset = DataLoader(train_vardat, batch_size=train_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
         
@@ -108,6 +119,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                                               actions=[torch.from_numpy(actions[i]).to(torch.float32) for i in test_indices],
                                               rewards=[torch.from_numpy(rewards[i]).to(torch.float32) for i in test_indices],
                                               terminals=[torch.from_numpy(terminals[i]).to(torch.float32) for i in test_indices],
+                                              true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in test_indices],
                                               )
         test_dataset = DataLoader(test_vardat, batch_size=train_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
 
@@ -117,6 +129,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                                                         actions=[torch.from_numpy(actions[i]).to(torch.float32) for i in val_indices],
                                                         rewards=[torch.from_numpy(rewards[i]).to(torch.float32) for i in val_indices],
                                                         terminals=[torch.from_numpy(terminals[i]).to(torch.float32) for i in val_indices],
+                                                        true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in val_indices],
                                                         )
             val_dataset = DataLoader(val_vardat, batch_size=train_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
         
