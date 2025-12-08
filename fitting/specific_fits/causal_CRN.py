@@ -3,11 +3,9 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pad_packed_sequence
 
 def crn_forward(model, treatments, covariates, lambda_alpha, **kwargs):
-    
-    pad_packed_sequence(covariates, batch_first=True)
-
     batch_size, seq_len, treat_dim = treatments.data.shape
     zeros = torch.zeros(batch_size, 1, treat_dim).to(treatments.device)
+
     prev_treatments = torch.cat([zeros, treatments[:, :-1, :]], dim=1)
 
     pred_outcomes, pred_treatment_logits = model(

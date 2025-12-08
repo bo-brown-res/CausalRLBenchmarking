@@ -77,6 +77,9 @@ def main():
         'n_steps_per_epoch': 1000,
         'initial_temperature': 0.1,
         'lambda_alpha': 1.0,
+        'max_seq_len': 24*7,
+        'rnn_hidden_units': 256,
+        'fc_hidden_units': 128
     }
 
     #load dataset

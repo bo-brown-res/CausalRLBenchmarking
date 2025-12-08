@@ -9,6 +9,10 @@ class VariableLengthDataset(Dataset):
             torch.nn.utils.rnn.pad_sequence(actions, batch_first=True),
             torch.nn.utils.rnn.pad_sequence(rewards, batch_first=True),
             torch.nn.utils.rnn.pad_sequence(terminals, batch_first=True),
+            # observations,
+            # actions,
+            # rewards,
+            # terminals,
             torch.tensor([len(seq) for seq in observations])
         ]
 
@@ -25,15 +29,25 @@ class VariableLengthDataset(Dataset):
     
 
 def pack_collate(batch):
-    padded_obs = torch.stack([x[0] for x in batch])
-    padded_acts = torch.stack([x[1] for x in batch])
-    padded_rwds = torch.stack([x[2] for x in batch])
-    padded_trms = torch.stack([x[3] for x in batch])
-    dlengths = [x[4] for x in batch]
+    # padded_obs = torch.stack([x[0] for x in batch])
+    # padded_acts = torch.stack([x[1] for x in batch])
+    # padded_rwds = torch.stack([x[2] for x in batch])
+    # padded_trms = torch.stack([x[3] for x in batch])
+    # dlengths = [x[4] for x in batch]
 
-    obs = torch.nn.utils.rnn.pack_padded_sequence(padded_obs, dlengths, batch_first=True, enforce_sorted=False)
-    acts = torch.nn.utils.rnn.pack_padded_sequence(padded_acts, dlengths, batch_first=True, enforce_sorted=False)
-    rwds = torch.nn.utils.rnn.pack_padded_sequence(padded_rwds, dlengths, batch_first=True, enforce_sorted=False)
-    term = torch.nn.utils.rnn.pack_padded_sequence(padded_trms, dlengths, batch_first=True, enforce_sorted=False)
+    # obs = torch.nn.utils.rnn.pack_padded_sequence(padded_obs, dlengths, batch_first=True, enforce_sorted=False)
+    # acts = torch.nn.utils.rnn.pack_padded_sequence(padded_acts, dlengths, batch_first=True, enforce_sorted=False)
+    # rwds = torch.nn.utils.rnn.pack_padded_sequence(padded_rwds, dlengths, batch_first=True, enforce_sorted=False)
+    # term = torch.nn.utils.rnn.pack_padded_sequence(padded_trms, dlengths, batch_first=True, enforce_sorted=False)
            
+    # obs = torch.nested.nested_tensor([x[0] for x in batch], layout=torch.jagged)
+    # acts = torch.nested.nested_tensor([x[1] for x in batch], layout=torch.jagged)
+    # rwds = torch.nested.nested_tensor([x[2] for x in batch], layout=torch.jagged)
+    # term = torch.nested.nested_tensor([x[3] for x in batch], layout=torch.jagged)
+
+    obs = torch.stack([x[0] for x in batch])
+    acts = torch.stack([x[1] for x in batch])
+    rwds = torch.stack([x[2] for x in batch])
+    term = torch.stack([x[3] for x in batch])
+
     return obs, acts, rwds, term
