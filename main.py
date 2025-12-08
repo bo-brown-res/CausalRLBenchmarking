@@ -54,8 +54,8 @@ def main():
         # 'proximal_rl': ['RL', None],
     #causal-based methods
         # 'causal_forest': ['CS', None],
-        'tarnet': ['CS', None],
-        'dragonnet': ['CS', None],
+        'TARNet': ['CS', None],
+        'DragonNet': ['CS', None],
         'CRN': ['CS', None],
         # 'T4': ['CS', None],
         # 'gtransformer': ['CS', None],
@@ -86,6 +86,9 @@ def main():
         #CRN params
         'rnn_hidden_units': 128, #256,
         'fc_hidden_units': 64, # 128
+        #DragonNet / TARNet
+        'hidden_units': 128,
+        'dragon_alpha': 1.0
     }
 
     #load dataset

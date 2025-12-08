@@ -5,6 +5,8 @@ from tqdm import tqdm
 import pandas as pd
 
 
+
+
 def compute_true_ite_error(model, treatments, covariates, true_effects, **kwargs):
     # actions_taken = treatments
     val_of_acts_taken = model.predict_treatment_effect(treatments, covariates, **kwargs).squeeze()
@@ -49,7 +51,39 @@ def setup_and_run_cs(
             'criterion_outcome': nn.MSELoss(),
             'criterion_treatment': nn.CrossEntropyLoss(),
         })
+    elif method_name == 'TARNet':
+        from methods.causal_based.TARNet import TARNet
+        from fitting.specific_fits.causal_CRN import tarnet_loss
 
+        model = TARNet(
+            num_covariates=train_dataset.dataset[0][0].shape[-1],
+            num_treatments=train_dataset.dataset[0][1].shape[-1],
+            num_outputs=train_dataset.dataset[0][2].shape[-1],
+            hidden_units=train_config.get('hidden_units', 64),
+        ).to(train_config.get('device'))
+
+        model_loss_fn = tarnet_loss
+
+        kwargs.update({
+            'hidden_units': train_config.get('hidden_units', 64),
+        })
+    elif method_name == 'DragonNet':
+        from methods.causal_based.DragonNet import DragonNet
+        from fitting.specific_fits.causal_CRN import dragonnet_loss
+
+        model = DragonNet(
+            num_covariates=train_dataset.dataset[0][0].shape[-1],
+            num_treatments=train_dataset.dataset[0][1].shape[-1],
+            num_outputs=train_dataset.dataset[0][2].shape[-1],
+            hidden_units=train_config.get('hidden_units', 64),
+        ).to(train_config.get('device'))
+
+        model_loss_fn = dragonnet_loss
+
+        kwargs.update({
+            'hidden_units': train_config.get('hidden_units', 64),
+            'dragon_alpha': train_config.get('dragon_alpha', 1.0),
+        })
     else:
         raise ValueError(f"Unknown causal method name: {method_name}")
     

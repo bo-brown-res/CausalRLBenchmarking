@@ -20,6 +20,7 @@ class TARNet(nn.Module):
                 nn.Linear(hidden_units, num_outputs)
             ))
 
+
     def forward(self, covariates, **kwargs):
         phi = self.shared_net(covariates)
         
@@ -28,3 +29,15 @@ class TARNet(nn.Module):
             outs.append(getattr(self, f'head{t}')(phi))
 
         return outs
+    
+
+    def predict_treatment_effect(self, treatments, covariates, lambda_alpha, **kwargs):
+        was_training = self.training
+        self.eval() 
+        
+        with torch.no_grad():
+            outcomes_per_t_action, _ = self(treatments, covariates, lambda_alpha, **kwargs)
+            
+        self.train(mode=was_training)
+        
+        return outcomes_per_t_action

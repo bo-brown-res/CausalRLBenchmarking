@@ -29,6 +29,7 @@ class DragonNet(nn.Module):
             nn.Sigmoid()
         )
 
+
     def forward(self, covariates, **kwargs):
         #pad to ull seq length if needed
 
@@ -40,3 +41,12 @@ class DragonNet(nn.Module):
         t_prob = self.propensity_head(phi)
         
         return t_prob, outs
+
+
+    def predict_treatment_effect(self, treatments, covariates, **kwargs):
+        _, ites = self(covariates, **kwargs)
+
+        pred_stack = torch.stack(ites, dim=-1).squeeze()
+        factual_predictions = torch.gather(pred_stack, 2, treatments.argmax(dim=-1).unsqueeze(-1)).squeeze()
+
+        return factual_predictions
