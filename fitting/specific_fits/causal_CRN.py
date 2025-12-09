@@ -19,48 +19,23 @@ def crn_loss(predictions, true_outcomes, treatments, lambda_alpha, criterion_out
 
 
 def tarnet_loss(predictions, true_outcomes, treatments, **kwargs):
-    # 1. Stack the list of predictions into a single tensor
-    # Shape becomes: (Batch, Num_Treatments, Output_Dim)
-    pred_stack = torch.stack(predictions, dim=1)
-    
-    # 2. Prepare treatments for gathering
-    # We need to expand treatments to match the Output_Dim if necessary
-    # Shape changes from (Batch,) -> (Batch, 1, Output_Dim) for gathering
-    t_expanded = treatments.view(-1, 1, 1).expand(-1, 1, true_outcomes.shape[-1])
-    
-    # 3. Select the prediction corresponding to the actual treatment
-    # We gather along dim=1 (the treatment dimension)
-    factual_predictions = torch.gather(pred_stack, 1, t_expanded).squeeze(1)
-    
-    # 4. Compute standard loss (MSE for regression, CrossEntropy for classification)
-    # The paper typically uses MSE for continuous outcomes
-    loss = torch.nn.functional.mse_loss(factual_predictions, true_outcomes)
-    
-    return loss
+    pred_stack = torch.stack(predictions, dim=-1).squeeze()
+    factual_predictions = torch.gather(pred_stack, 2, treatments.argmax(dim=-1).unsqueeze(-1)).squeeze()
+    loss_outcome = torch.nn.functional.mse_loss(factual_predictions, true_outcomes.squeeze())
+    return loss_outcome
 
 
 def dragonnet_loss(predictions, true_outcomes, treatments, dragon_alpha, **kwargs):
     propensity_logits, pred_logits = predictions
     pred_stack = torch.stack(pred_logits, dim=-1).squeeze()
-    
-    # Expand treatments for gathering: (Batch, 1, Output_Dim)
-    # t_expanded = treatments.view(-1, 1, 1).expand(-1, 1, true_outcomes.shape[-1])
-    
-    # Gather factual predictions
+    #map predicted treatments to actually selected treatments - onyl fitting on treatments actually seen in data as per paper
     factual_predictions = torch.gather(pred_stack, 2, treatments.argmax(dim=-1).unsqueeze(-1)).squeeze()
-    
-    # Standard Regression Loss (MSE)
     loss_outcome = torch.nn.functional.mse_loss(factual_predictions, true_outcomes.squeeze())
     
-    # --- 2. Propensity Loss ---
-    # We use BCEWithLogitsLoss for numerical stability
-    # treatments must be float for BCE, shape (Batch, 1)
-    t_float = treatments.view(-1, 1).float()
+    #compute the secondary propensity score prediction loss
     loss_propensity = torch.nn.functional.binary_cross_entropy_with_logits(
         propensity_logits.squeeze(), 
         treatments.argmax(dim=-1).float())
     
-    # --- 3. Total Loss ---
     total_loss = loss_outcome + (dragon_alpha * loss_propensity)
-    
     return total_loss

@@ -5,9 +5,12 @@ import torch.nn.functional as F
 class TARNet(nn.Module):
     def __init__(self, num_covariates, num_treatments, num_outputs, hidden_units=64):
         super(TARNet, self).__init__()
+        self.num_treatments = num_treatments
         
         self.shared_net = nn.Sequential(
             nn.Linear(num_covariates, hidden_units),
+            nn.ELU(),
+            nn.Linear(hidden_units, hidden_units),
             nn.ELU(),
             nn.Linear(hidden_units, hidden_units),
             nn.ELU()
@@ -15,6 +18,8 @@ class TARNet(nn.Module):
 
         for t in range(num_treatments):
             setattr(self, f'head{t}', nn.Sequential(
+                nn.Linear(hidden_units, hidden_units),
+                nn.ELU(),
                 nn.Linear(hidden_units, hidden_units),
                 nn.ELU(),
                 nn.Linear(hidden_units, num_outputs)
@@ -31,13 +36,10 @@ class TARNet(nn.Module):
         return outs
     
 
-    def predict_treatment_effect(self, treatments, covariates, lambda_alpha, **kwargs):
-        was_training = self.training
-        self.eval() 
-        
-        with torch.no_grad():
-            outcomes_per_t_action, _ = self(treatments, covariates, lambda_alpha, **kwargs)
-            
-        self.train(mode=was_training)
-        
-        return outcomes_per_t_action
+    def predict_treatment_effect(self, treatments, covariates, **kwargs):
+        ite_values = self(covariates, **kwargs)
+
+        pred_stack = torch.stack(ite_values, dim=-1).squeeze()
+        factual_predictions = torch.gather(pred_stack, 2, treatments.argmax(dim=-1).unsqueeze(-1)).squeeze()
+
+        return factual_predictions

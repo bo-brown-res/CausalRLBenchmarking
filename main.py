@@ -111,7 +111,7 @@ def main():
             fmt='CS'
         )
     elif method_type == 'CS':
-        setup_and_run_cs(
+        trained_model, train_results, test_results = setup_and_run_cs(
             method_name=m_name,
             train_config=train_config,
             train_dataset=train_dataset,
@@ -123,11 +123,12 @@ def main():
         raise ValueError(f"Unknown method type: {method_type}")
 
 
+    print(f"Finished!")
+    # TODO: DO something with trained_model, train_results, test_results
 
 
 if __name__ == "__main__":
     main()  
-# sac = d3rlpy.algos.SACConfig(compile_graph=True).create(device="cuda:0")
 
 
 

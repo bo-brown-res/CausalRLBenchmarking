@@ -12,11 +12,15 @@ class DragonNet(nn.Module):
             nn.Linear(num_covariates, hidden_units),
             nn.ELU(),
             nn.Linear(hidden_units, hidden_units),
+            nn.ELU(),
+            nn.Linear(hidden_units, hidden_units),
             nn.ELU()
         )
         
         for t in range(num_treatments):
             setattr(self, f'head{t}', nn.Sequential(
+                nn.Linear(hidden_units, hidden_units),
+                nn.ELU(),
                 nn.Linear(hidden_units, hidden_units),
                 nn.ELU(),
                 nn.Linear(hidden_units, num_outputs)
@@ -26,6 +30,8 @@ class DragonNet(nn.Module):
             nn.Linear(hidden_units, hidden_units),
             nn.ELU(),
             nn.Linear(hidden_units, 1), 
+            nn.ELU(),
+            nn.Linear(hidden_units, 1),
             nn.Sigmoid()
         )
 

@@ -92,7 +92,7 @@ def setup_and_run_cs(
         'true_ite_error': compute_true_ite_error
     }
 
-    trained_model = training_loop(
+    trained_model, train_results = training_loop(
         model=model,
         train_dataloader=train_dataset,
         val_dataloader=val_dataset,
@@ -104,7 +104,7 @@ def setup_and_run_cs(
         **kwargs
     )
 
-    test_model(
+    test_results = test_model(
         model,
         test_dataloader=test_dataset,
         model_forward_fn=model.forward,
@@ -113,7 +113,7 @@ def setup_and_run_cs(
         **kwargs
     )
 
-    return trained_model
+    return trained_model, train_results, test_results
 
 
 
@@ -186,8 +186,9 @@ def training_loop(model, train_dataloader, val_dataloader, model_forward_fn, mod
             'avg_train_loss': avg_train_loss,
         }, **validation_results})
 
-        pd.DataFrame(records).to_csv(f"training_{model.__class__.__name__}_{kwargs['ds_name']}.csv")
-    return model
+        train_results = pd.DataFrame(records)
+        train_results.to_csv(f"training_{model.__class__.__name__}_{kwargs['ds_name']}.csv")
+    return model, train_results
 
 def test_model(model, test_dataloader, model_forward_fn, model_loss_fn, metricsfn_dict, **kwargs):
     validation_results = evaluate_dataset(
@@ -199,8 +200,8 @@ def test_model(model, test_dataloader, model_forward_fn, model_loss_fn, metricsf
         testing_tag='test',
         **kwargs
     )
-    pd.DataFrame([validation_results]).to_csv(f"testing_{model.__class__.__name__}_{kwargs['ds_name']}.csv")
-
+    test_results = pd.DataFrame([validation_results]).to_csv(f"testing_{model.__class__.__name__}_{kwargs['ds_name']}.csv")
+    return test_results
 
 def evaluate_dataset(model, dataloader, model_forward_fn, model_loss_fn, device, metricsfn_dict, **kwargs):
     """
