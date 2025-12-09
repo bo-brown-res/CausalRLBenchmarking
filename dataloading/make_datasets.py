@@ -46,7 +46,7 @@ def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fm
         raise ValueError(f"Dataset {ds_name} not recognized.")
     
 
-    train_dataset, val_dataset, test_dataset = build_train_test_datasets(
+    train_dataset, val_dataset, test_dataset, seperate_ites = build_train_test_datasets(
         dformat=fmt,
         observations=obs, 
         actions=acts, 
@@ -57,7 +57,7 @@ def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fm
         validation_size=val_size,
         train_config=train_config,
     )
-    return train_dataset, val_dataset, test_dataset
+    return train_dataset, val_dataset, test_dataset, seperate_ites
 
 
 def build_train_test_datasets(dformat, observations, actions, rewards, terminals, true_ites, test_size=0.2, validation_size=0.0, train_config=None):
@@ -68,6 +68,8 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
     train_indices = random_indices[:n_train_episodes]
     val_indices = []
     n_val_episodes = 0
+
+    seperate_ites = {}
 
     if validation_size > 0.0:
         n_val_episodes = int(n_episodes * validation_size)
@@ -80,15 +82,17 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
             actions=np.concat([actions[i] for i in train_indices],axis=0),
             rewards=np.concat([rewards[i] for i in train_indices],axis=0),
             terminals=np.concat([terminals[i] for i in train_indices],axis=0),
-            true_ites=np.concat([true_ites[i] for i in train_indices],axis=0),
         )
+        seperate_ites['train'] = np.concat([true_ites[i] for i in train_indices],axis=0)
+
         test_dataset = d3rlpy.dataset.MDPDataset(
             observations=np.concat([observations[i] for i in test_indices],axis=0),
             actions=np.concat([actions[i] for i in test_indices],axis=0),
             rewards=np.concat([rewards[i] for i in test_indices],axis=0),
             terminals=np.concat([terminals[i] for i in test_indices],axis=0),
-            true_ites=np.concat([true_ites[i] for i in test_indices],axis=0),
         )
+        seperate_ites['test'] = np.concat([true_ites[i] for i in test_indices],axis=0)
+
         val_dataset = None
         if validation_size > 0.0:
             val_dataset = d3rlpy.dataset.MDPDataset(
@@ -96,8 +100,9 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                 actions=np.concat([actions[i] for i in val_indices],axis=0),
                 rewards=np.concat([rewards[i] for i in val_indices],axis=0),
                 terminals=np.concat([terminals[i] for i in val_indices],axis=0),
-                true_ites=np.concat([true_ites[i] for i in val_indices],axis=0),
             )
+            seperate_ites['val'] = np.concat([true_ites[i] for i in val_indices],axis=0)
+
     elif dformat == 'CS':
         max_seq_len = train_config.get('max_seq_len', None)
         if max_seq_len is not None:
@@ -137,4 +142,4 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
         raise ValueError(f"Unknown dataset format: {dformat}")
 
 
-    return train_dataset, val_dataset, test_dataset
+    return train_dataset, val_dataset, test_dataset, seperate_ites

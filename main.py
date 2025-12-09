@@ -49,8 +49,9 @@ def main():
     working_methods = {
     #rl-based methods
         'policy_iteration':  ['RL', None],
-        'causal_dqn':        ['RL', None],
-        'soft_actor_critic': ['RL', None],
+        'CausalDQN':        ['RL', None],
+        'SoftActorCritic': ['RL', None],
+        'DQN': ['RL', None],
         # 'proximal_rl': ['RL', None],
     #causal-based methods
         # 'causal_forest': ['CS', None],
@@ -78,8 +79,8 @@ def main():
         'n_critics': 2,
         'alpha': 0.1,
         'mask_size': 10,
-        'n_steps': 3000,
-        'n_steps_per_epoch': 1000,
+        'n_steps': 300, #3000,
+        'n_steps_per_epoch': 100, #1000,
         'initial_temperature': 0.1,
         'lambda_alpha': 1.0,
         'max_seq_len': 24*7,
@@ -92,7 +93,7 @@ def main():
     }
 
     #load dataset
-    train_dataset, val_dataset, test_dataset = select_dataset(
+    train_dataset, val_dataset, test_dataset,seperate_ites = select_dataset(
         ds_name=args.dataset_name, 
         val_size=0.1, 
         test_size=0.2,
@@ -108,7 +109,7 @@ def main():
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             test_dataset=test_dataset,
-            fmt='CS'
+            seperate_ites=seperate_ites,
         )
     elif method_type == 'CS':
         trained_model, train_results, test_results = setup_and_run_cs(

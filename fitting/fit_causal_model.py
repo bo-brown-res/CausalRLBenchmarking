@@ -4,19 +4,8 @@ import torch.nn as nn
 from tqdm import tqdm
 import pandas as pd
 
+from evaluate.action_val_eval import compute_true_ite_error
 
-
-
-def compute_true_ite_error(model, treatments, covariates, true_effects, **kwargs):
-    # actions_taken = treatments
-    val_of_acts_taken = model.predict_treatment_effect(treatments, covariates, **kwargs).squeeze()
-    # true_vals_of_acts_taken = true_effects[]
-    taken_acts_idxs = treatments.argmax(dim=-1)
-    true_vals_of_acts_taken = torch.gather(true_effects, 2, taken_acts_idxs.unsqueeze(-1)).squeeze(-1)
-
-    diff = (true_vals_of_acts_taken - val_of_acts_taken)**2
-    mse = diff.mean()
-    return mse
 
 
 def setup_and_run_cs(

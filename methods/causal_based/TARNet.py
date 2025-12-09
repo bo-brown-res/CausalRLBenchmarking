@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+#architecutre from: https://repository.tudelft.nl/record/uuid:cd0c394b-957a-4c98-a7b5-d6d43701074f
+
 class TARNet(nn.Module):
     def __init__(self, num_covariates, num_treatments, num_outputs, hidden_units=64):
         super(TARNet, self).__init__()
