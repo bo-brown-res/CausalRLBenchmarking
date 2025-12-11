@@ -37,6 +37,16 @@ def main():
         '--dataset_name', type=str, default='mimic4_hourly',
         help='Name of the dataset to use. Options: mimic4_hourly'
     )
+    argparser.add_argument(
+        '--targets', type=str, default='mimic4_hourly',
+        help='Name of the dataset to use. Options: mimic4_hourly',
+        choices=['reward', 'return', '1-step-return']
+    )    
+    argparser.add_argument(
+        '--target_value', type=str, default='mimic4_hourly',
+        help='Name of the dataset to use. Options: mimic4_hourly',
+        choices=['binary', 'plusminusone', 'cumulative', 'reals', 'finals', 'final_sum']
+    )
     args = argparser.parse_args()
     set_random_seed(123)
 
@@ -78,8 +88,8 @@ def main():
         'n_critics': 2,
         'alpha': 0.1,
         'mask_size': 10,
-        'n_steps': 200000, #200000, #3000,
-        'n_steps_per_epoch': 5000, #1000, #1000,
+        'n_steps': 100000, #200000, #3000,
+        'n_steps_per_epoch': 1000, #1000, #1000,
         'initial_temperature': 0.1,
         'lambda_alpha': 1.0,
         #CRN params
@@ -87,14 +97,15 @@ def main():
         'fc_hidden_units': 64, # 128
         #DragonNet / TARNet
         'hidden_units': 128,
-        'dragon_alpha': 1.0
+        'dragon_alpha': 1.0,
+        'targets': args.targets,
     }
 
     data_config ={
         'batch_size': batch_size,
         'max_seq_len': 24*7,
-        'targets': 'reward', # 'return', '1-step-return'
-        'target_value': 'binary' # 'binary', 'plusminusone', 'cumulative', 'reals' 'final'
+        'targets': args.targets, #'reward', # 'return', '1-step-return'
+        'target_value': args.target_value, #'binary' # 'binary', 'plusminusone', 'cumulative', 'reals' 'final'
     }
     if method_type == 'rl':
         print(f"INFO - We are using RL, so must provide a full trajectory of reward values")

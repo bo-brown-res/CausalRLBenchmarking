@@ -18,9 +18,12 @@ def crn_loss(predictions, true_outcomes, treatments, lambda_alpha, criterion_out
 
 
 
-def tarnet_loss(predictions, true_outcomes, treatments, **kwargs):
+def tarnet_loss(predictions, true_outcomes, treatments, targets='return', **kwargs):
     pred_stack = torch.stack(predictions, dim=-1).squeeze()
     factual_predictions = torch.gather(pred_stack, 2, treatments.argmax(dim=-1).unsqueeze(-1)).squeeze()
+    
+    if targets == 'return':
+        factual_predictions = factual_predictions.sum(-1)
     loss_outcome = torch.nn.functional.mse_loss(factual_predictions, true_outcomes.squeeze())
     return loss_outcome
 

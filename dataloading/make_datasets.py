@@ -34,9 +34,12 @@ def get_data_items(data_object, subsample_frac=None):
 
     return observations, actions, rewards, terminals, true_ites, actionmap, colnames, threshold_hours
 
+import numpy as np
+
+
 
 def format_targets(rwds, data_config):
-    # 'target_value': 'binary' # 'binary', 'plusminusone', 'cumulative', 'reals' 'final'
+    # 'target_value': 'binary' # 'binary', 'plusminusone', 'cumulative', 'reals' 'finals'
     if data_config['target_value'] == 'binary':
         proc_r = [(x > 30).astype(int) for x in rwds]
     elif data_config['target_value'] == 'plusminusone':
@@ -45,8 +48,20 @@ def format_targets(rwds, data_config):
         proc_r = [np.cumsum(x) for x in rwds]
     elif data_config['target_value'] == 'reals':
         proc_r = rwds
-    elif data_config['target_value'] == 'final':
-        proc_r = [np.concatenate([np.zeros(x.shape[0]-1), x[-1]]) for x in rwds]
+    elif data_config['target_value'] == 'finals':
+        proc_r = [np.concatenate([np.zeros(x.shape[0]-1), x[-1:]]) for x in rwds]
+    elif data_config['target_value'] == 'final_sum':
+        proc_r = [np.concatenate([np.zeros(x.shape[0]-1), [x.sum()]]) for x in rwds]
+    elif 'randcumulative=' in data_config['target_value']:
+        mask_prob = float(data_config['target_value'].replace('randcumulative=', ''))
+        proc_r = [np.cumsum(x) for x in rwds]
+        masks = [np.random.choice([0, 1], size=len(x), p=[1-mask_prob, mask_prob]) for x in rwds]
+        proc_r = [x*masks[i] for i,x in enumerate(proc_r)]
+    elif 'random=' in data_config['target_value']:
+        mask_prob = float(data_config['target_value'].replace('random=', ''))
+        proc_r = rwds
+        masks = [np.random.choice([0, 1], size=len(x), p=[1-mask_prob, mask_prob]) for x in rwds]
+        proc_r = [x*masks[i] for i,x in enumerate(proc_r)]
     else:
         raise NotImplementedError(f"proc_r {proc_r} not valid!")
 
@@ -54,11 +69,11 @@ def format_targets(rwds, data_config):
     if data_config['targets'] == 'reward':
         pass
     elif data_config['targets'] == 'return': 
-        proc_r = [x[-1] for x in proc_r]
+        proc_r = [x[-1:] for x in proc_r]
     elif '-step-return' in data_config['targets']:
         n_steps = int(data_config['targets'].replace('-step-return', ''))
         proc_r = [[np.concatenate([x[z:z+n_steps], x[-1]]) for z in range(len(x))] for x in proc_r]
-        
+
     return proc_r
 
 

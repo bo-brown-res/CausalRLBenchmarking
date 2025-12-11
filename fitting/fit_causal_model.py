@@ -21,6 +21,7 @@ def setup_and_run_cs(
         'device': train_config.get('device', 'cpu'),
         'ds_name': dataset_name
     }
+    targettype = train_config['targets']
 
     if method_name == 'CRN':
         from methods.causal_based.CounterfactualRecurrentNetwork import CRN
@@ -90,6 +91,7 @@ def setup_and_run_cs(
         num_epochs=train_config.get('n_steps', 100),
         learning_rate=train_config.get('learning_rate', 0.001),
         metricsfn_dict=my_metricsfn_dict,
+        targets=targettype,
         **kwargs
     )
 
