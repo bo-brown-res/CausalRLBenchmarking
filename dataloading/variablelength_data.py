@@ -11,6 +11,13 @@ class VariableLengthDataset(Dataset):
         torch_trm = torch.nn.utils.rnn.pad_sequence(terminals, batch_first=True)
         torch_ite = torch.nn.utils.rnn.pad_sequence(true_ites, batch_first=True)
 
+        lengths = [len(seq) for seq in observations]
+        max_len = max(lengths)
+
+        masks = torch.stack(
+            [torch.concat([torch.ones(l), torch.zeros(max_len-l)]) if l < max_len else torch.ones(l) for l in lengths]
+        )
+
         if fmt == '3d_r_a':
             if torch_act.ndim == 2 or torch_act.shape[-1] == 1:
                 torch_act = torch.nn.functional.one_hot(torch_act.to(torch.long), num_classes=int(torch_act.max())+1) 
@@ -23,6 +30,7 @@ class VariableLengthDataset(Dataset):
             torch_rwd,
             torch_trm,
             torch_ite,
+            masks,
             # observations,
             # actions,
             # rewards,
@@ -39,8 +47,8 @@ class VariableLengthDataset(Dataset):
         r = self.data[2][idx] #reward
         t = self.data[3][idx] #terminal
         e = self.data[4][idx] #ites
-        l = self.data[5][idx] #length
-        return o, a, r, t, e, l
+        m = self.data[5][idx] #masks
+        return o, a, r, t, e, m
     
 
 def pack_collate(batch):
@@ -65,5 +73,6 @@ def pack_collate(batch):
     rwds = torch.stack([x[2] for x in batch])
     term = torch.stack([x[3] for x in batch])
     ites = torch.stack([x[4] for x in batch])
+    masks = torch.stack([x[5] for x in batch])
 
-    return obs, acts, rwds, term, ites
+    return obs, acts, rwds, term, ites, masks

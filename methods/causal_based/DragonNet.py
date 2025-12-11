@@ -29,7 +29,7 @@ class DragonNet(nn.Module):
         self.propensity_head = nn.Sequential(
             nn.Linear(hidden_units, hidden_units),
             nn.ELU(),
-            nn.Linear(hidden_units, 1), 
+            nn.Linear(hidden_units, hidden_units), 
             nn.ELU(),
             nn.Linear(hidden_units, 1),
             nn.Sigmoid()

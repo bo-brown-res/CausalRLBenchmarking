@@ -26,7 +26,7 @@ def setup_and_run_rl(
 
     shared_evalautor_dict = {
             'VAL_td_error': d3rlpy.metrics.TDErrorEvaluator(episodes=val_dataset.episodes),
-            'VAL_average_value': d3rlpy.metrics.AverageValueEstimationEvaluator(episodes=val_dataset.episodes),
+            # 'VAL_average_value': d3rlpy.metrics.AverageValueEstimationEvaluator(episodes=val_dataset.episodes),
             'VAL_true_value_error': TrueValueErrorEvaluator(
                 get_true_state_val_fn=lambda obs: np.zeros(len(obs)),
                 error_type='mae',
@@ -35,7 +35,7 @@ def setup_and_run_rl(
             ),
             #want to keep track of test set performance during training as well, but not use for making decisions.
             'TEST_td_error': d3rlpy.metrics.TDErrorEvaluator(episodes=test_dataset.episodes),
-            'TEST_average_value': d3rlpy.metrics.AverageValueEstimationEvaluator(episodes=test_dataset.episodes),
+            # 'TEST_average_value': d3rlpy.metrics.AverageValueEstimationEvaluator(episodes=test_dataset.episodes),
             'TEST_true_value_error': TrueValueErrorEvaluator(
                 get_true_state_val_fn=lambda obs: np.zeros(len(obs)),
                 error_type='mae',

@@ -126,7 +126,7 @@ def training_loop(model, train_dataloader, val_dataloader, model_forward_fn, mod
         pbar = tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{num_epochs}")
         
         for batch in pbar:
-            covariates, treatments, rewards, terminations, true_ites = batch
+            covariates, treatments, rewards, terminations, true_ites, mask = batch
             covariates = covariates.to(device)
             treatments = treatments.to(device)
             rewards = rewards.to(device)
@@ -208,7 +208,7 @@ def evaluate_dataset(model, dataloader, model_forward_fn, model_loss_fn, device,
     # Disable gradient calculation for efficiency
     with torch.no_grad():
         for batch in dataloader:
-            covariates, treatments, rewards, terminations, true_ites = batch
+            covariates, treatments, rewards, terminations, true_ites, mask = batch
             covariates = covariates.to(device)
             treatments = treatments.to(device)
             rewards = rewards.to(device)
@@ -225,7 +225,7 @@ def evaluate_dataset(model, dataloader, model_forward_fn, model_loss_fn, device,
             total_loss += loss.item()
             
             for name, m_fn in temp_metricsfn_dict.items():
-                metrics_results[name] += m_fn(model, treatments=treatments, covariates=covariates, true_effects=true_ites, **kwargs).item()
+                metrics_results[name] += m_fn(model, treatments=treatments, covariates=covariates, true_effects=true_ites, mask=mask, **kwargs).item()
     
             num_batches += 1
 

@@ -35,16 +35,48 @@ def get_data_items(data_object, subsample_frac=None):
     return observations, actions, rewards, terminals, true_ites, actionmap, colnames, threshold_hours
 
 
-def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fmt='RL', train_config=None):
+def format_targets(rwds, data_config):
+    # 'target_value': 'binary' # 'binary', 'plusminusone', 'cumulative', 'reals' 'final'
+    if data_config['target_value'] == 'binary':
+        proc_r = [(x > 30).astype(int) for x in rwds]
+    elif data_config['target_value'] == 'plusminusone':
+        proc_r = [(x > 30).astype(int) - (x < -30).astype(int)  for x in rwds]
+    elif data_config['target_value'] == 'cumulative':
+        proc_r = [np.cumsum(x) for x in rwds]
+    elif data_config['target_value'] == 'reals':
+        proc_r = rwds
+    elif data_config['target_value'] == 'final':
+        proc_r = [np.concatenate([np.zeros(x.shape[0]-1), x[-1]]) for x in rwds]
+    else:
+        raise NotImplementedError(f"proc_r {proc_r} not valid!")
+
+    # 'targets': 'reward', # 'return', '1-step-return'
+    if data_config['targets'] == 'reward':
+        pass
+    elif data_config['targets'] == 'return': 
+        proc_r = [x[-1] for x in proc_r]
+    elif '-step-return' in data_config['targets']:
+        n_steps = int(data_config['targets'].replace('-step-return', ''))
+        proc_r = [[np.concatenate([x[z:z+n_steps], x[-1]]) for z in range(len(x))] for x in proc_r]
+        
+    return proc_r
+
+
+def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fmt='RL', data_config=None):
     if ds_name == "mimic4_hourly":
         mimic4_hourly_data = pickle.load(open("/mnt/d/research/rl_causal/notebooks/mimic4_hourly_datapackage.pkl", "rb"))
         obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(mimic4_hourly_data, subsample_frac=subsample_frac)
     elif ds_name == "epicare_len12_acts4ep_10000":
         epicare_len12_acts4ep_10000 = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_len12_acts4ep_10000.pkl", "rb"))
         obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(epicare_len12_acts4ep_10000, subsample_frac=subsample_frac)
+    elif ds_name == "epicare_len72_acts4_vars32_eps25000":
+        epicare_len72_acts4_vars32_eps25000 = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_len72_acts4_vars32_eps25000.pkl", "rb"))
+        obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(epicare_len72_acts4_vars32_eps25000, subsample_frac=subsample_frac)
     else:
         raise ValueError(f"Dataset {ds_name} not recognized.")
     
+
+    rwds = format_targets(rwds, data_config)
 
     train_dataset, val_dataset, test_dataset, seperate_ites = build_train_test_datasets(
         dformat=fmt,
@@ -55,12 +87,12 @@ def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fm
         true_ites=true_ites,
         test_size=test_size, 
         validation_size=val_size,
-        train_config=train_config,
+        data_config=data_config,
     )
     return train_dataset, val_dataset, test_dataset, seperate_ites
 
 
-def build_train_test_datasets(dformat, observations, actions, rewards, terminals, true_ites, test_size=0.2, validation_size=0.0, train_config=None):
+def build_train_test_datasets(dformat, observations, actions, rewards, terminals, true_ites, test_size=0.2, validation_size=0.0, data_config=None):
     n_episodes = len(observations)
     random_indices = np.random.permutation(n_episodes)
     n_train_episodes = int(n_episodes * (1 - test_size))
@@ -104,7 +136,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
             seperate_ites['val'] = np.concat([true_ites[i] for i in val_indices],axis=0)
 
     elif dformat == 'CS':
-        max_seq_len = train_config.get('max_seq_len', None)
+        max_seq_len = data_config.get('max_seq_len', None)
         if max_seq_len is not None:
             observations = [obs[-max_seq_len:] for obs in observations]
             actions = [act[-max_seq_len:] for act in actions]
@@ -118,7 +150,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                                               terminals=[torch.from_numpy(terminals[i]).to(torch.float32) for i in train_indices],
                                               true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in train_indices],
                                               )
-        train_dataset = DataLoader(train_vardat, batch_size=train_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
+        train_dataset = DataLoader(train_vardat, batch_size=data_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
         
         test_vardat = VariableLengthDataset(observations=[torch.from_numpy(observations[i]).to(torch.float32) for i in test_indices],
                                               actions=[torch.from_numpy(actions[i]).to(torch.float32) for i in test_indices],
@@ -126,7 +158,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                                               terminals=[torch.from_numpy(terminals[i]).to(torch.float32) for i in test_indices],
                                               true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in test_indices],
                                               )
-        test_dataset = DataLoader(test_vardat, batch_size=train_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
+        test_dataset = DataLoader(test_vardat, batch_size=data_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
 
         val_dataset = None
         if validation_size > 0.0:
@@ -136,7 +168,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                                                         terminals=[torch.from_numpy(terminals[i]).to(torch.float32) for i in val_indices],
                                                         true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in val_indices],
                                                         )
-            val_dataset = DataLoader(val_vardat, batch_size=train_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
+            val_dataset = DataLoader(val_vardat, batch_size=data_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
         
     else:
         raise ValueError(f"Unknown dataset format: {dformat}")

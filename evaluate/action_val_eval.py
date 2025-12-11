@@ -20,13 +20,14 @@ import torch
 def compute_true_ite_error(model, treatments, covariates, true_effects, fmt='cs', **kwargs):
     # actions_taken = treatments
     val_of_acts_taken = model.predict_treatment_effect(treatments, covariates, **kwargs)
+    mask = None
 
     if fmt == 'cs':
+        mask = kwargs.get('mask')
         val_of_acts_taken = val_of_acts_taken.squeeze()
         taken_acts_idxs = treatments.argmax(dim=-1)
         true_vals_of_acts_taken = torch.gather(true_effects, 2, taken_acts_idxs.unsqueeze(-1)).squeeze(-1)
-
-    if 'rl_' in fmt:
+    elif 'rl_' in fmt:
         val_of_acts_taken = np.concatenate(val_of_acts_taken)
         if fmt == 'rl_test':
             true_effects = torch.from_numpy(true_effects)
@@ -37,5 +38,8 @@ def compute_true_ite_error(model, treatments, covariates, true_effects, fmt='cs'
     
 
     diff = (true_vals_of_acts_taken - val_of_acts_taken)**2
-    mse = diff.mean()
+    if mask is not None:
+        mse = diff.sum() / mask.sum()
+    else:
+        mse = diff.mean()
     return mse

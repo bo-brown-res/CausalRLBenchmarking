@@ -38,7 +38,6 @@ def main():
         help='Name of the dataset to use. Options: mimic4_hourly'
     )
     args = argparser.parse_args()
-
     set_random_seed(123)
 
     valid_datasets = [
@@ -63,27 +62,26 @@ def main():
     }
 
     m_name = args.method_name
-
     if m_name in working_methods:
         method_type, run_method_function = working_methods[m_name]
     else:
         raise ValueError(f"Unknown method name: {m_name}")
 
     #define the training config
+    batch_size = 512
+
     train_config = {
         'device': 'cuda:0',
-        # 'batch_size': 512,
-        'batch_size': 128,
+        'batch_size': batch_size,
         'learning_rate': 1e-3,
-        'discount_factor': 0.99,
+        'discount_factor': 1.0, #0.99,
         'n_critics': 2,
         'alpha': 0.1,
         'mask_size': 10,
-        'n_steps': 300, #3000,
-        'n_steps_per_epoch': 100, #1000,
+        'n_steps': 200000, #200000, #3000,
+        'n_steps_per_epoch': 5000, #1000, #1000,
         'initial_temperature': 0.1,
         'lambda_alpha': 1.0,
-        'max_seq_len': 24*7,
         #CRN params
         'rnn_hidden_units': 128, #256,
         'fc_hidden_units': 64, # 128
@@ -92,6 +90,16 @@ def main():
         'dragon_alpha': 1.0
     }
 
+    data_config ={
+        'batch_size': batch_size,
+        'max_seq_len': 24*7,
+        'targets': 'reward', # 'return', '1-step-return'
+        'target_value': 'binary' # 'binary', 'plusminusone', 'cumulative', 'reals' 'final'
+    }
+    if method_type == 'rl':
+        print(f"INFO - We are using RL, so must provide a full trajectory of reward values")
+        data_config['targets'] = 'reward'
+
     #load dataset
     train_dataset, val_dataset, test_dataset,seperate_ites = select_dataset(
         ds_name=args.dataset_name, 
@@ -99,7 +107,7 @@ def main():
         test_size=0.2,
         # subsample_frac=0.1, #TODO: remove when algos working
         fmt=method_type,
-        train_config=train_config
+        data_config=data_config,
     )
 
     if method_type == 'RL':

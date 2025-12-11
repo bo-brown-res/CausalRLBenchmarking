@@ -24,7 +24,7 @@ def run_CausalDQN(
     causal_dqn_algo = CausalDQNConfig(
         observation_scaler=observation_scaler,
         # action_scaler=action_scaler, #only for continuous actions
-        reward_scaler=reward_scaler,
+        # reward_scaler=reward_scaler,
         optim_factory=optim_factory,
         batch_size=train_config['batch_size'], #512
         learning_rate=train_config['learning_rate'], #1e-3,
@@ -59,7 +59,7 @@ def run_SAC(
     
     sac_algo = d3rlpy.algos.DiscreteSACConfig(
         observation_scaler=observation_scaler,
-        reward_scaler=reward_scaler,
+        # reward_scaler=reward_scaler,
         actor_learning_rate=train_config['learning_rate'], #1e-3,
         critic_learning_rate=train_config['learning_rate'], #1e-3,
         actor_optim_factory=optim_factory,
@@ -96,7 +96,7 @@ def run_DQN(
     dqn_algo = d3rlpy.algos.DQNConfig(
         observation_scaler=observation_scaler,
         # action_scaler=action_scaler, #only for continuous actions
-        reward_scaler=reward_scaler,
+        # reward_scaler=reward_scaler,
         optim_factory=optim_factory,
         batch_size=train_config['batch_size'], #512
         learning_rate=train_config['learning_rate'], #1e-3,
