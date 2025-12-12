@@ -29,15 +29,15 @@ def run_experiments():
     # m_name = "DQN"
     # dname = "epicare_l48_a4_20v_deadcuredonly"
     dname = "epicare_l48_a4_20v_deadcuredonly_LOWBOOST"
-    targets = "-step-return"
+    # targets = "reward"
     targetvalue = "final_sum"
 
     commands = []
-    for m_name in ["DQN", "CQL", "CausalDQN", "SoftActorCritic"]: #"DQN", "CQL", "CausalDQN", "SoftActorCritic"
+    for m_name in ["TARNet", "DragonNet", "CRN"]:
         for state_masking_p in [1.0, 0.5]:
-            for kstep in [16]:#range(1,1+t):#range(1, 10+1):
+            for targets in ['reward', 'return']:
                 # mask_p = px / 10
-                savetag = f"outs_causal_lowboost/{kstep}{targets}_finsun+ret"
+                savetag = f"outs_causal_lowboost/{targets}_finsun+rew_p={state_masking_p}"
 
                 for seed in range(10000, 10000+s):
                     # print(f"--- Starting run with random_seed={seed} ---")
@@ -49,7 +49,7 @@ def run_experiments():
                         ###########
                         "--method_name", m_name,
                         "--dataset_name", dname,
-                        "--targets", f"{kstep}{targets}", 
+                        "--targets", f"{targets}", 
                         "--target_value", targetvalue,
                             ]
                     commands.append(command)
