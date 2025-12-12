@@ -41,9 +41,9 @@ import numpy as np
 def format_targets(rwds, data_config):
     # 'target_value': 'binary' # 'binary', 'plusminusone', 'cumulative', 'reals' 'finals'
     if data_config['target_value'] == 'binary':
-        proc_r = [(x > 30).astype(int) for x in rwds]
+        proc_r = [(x > 5).astype(int) for x in rwds]
     elif data_config['target_value'] == 'plusminusone':
-        proc_r = [(x > 30).astype(int) - (x < -30).astype(int)  for x in rwds]
+        proc_r = [(x > 5).astype(int) - (x < -5).astype(int)  for x in rwds]
     elif data_config['target_value'] == 'cumulative':
         proc_r = [np.cumsum(x) for x in rwds]
     elif data_config['target_value'] == 'reals':
@@ -72,26 +72,37 @@ def format_targets(rwds, data_config):
         proc_r = [x[-1:] for x in proc_r]
     elif '-step-return' in data_config['targets']:
         n_steps = int(data_config['targets'].replace('-step-return', ''))
-        proc_r = [[np.concatenate([x[z:z+n_steps], x[-1]]) for z in range(len(x))] for x in proc_r]
+        # proc_r = [[np.concatenate([x[z:z+n_steps], x[-1]]) for z in range(len(x))] for x in proc_r]
+        proc_r = [np.stack([np.sum(x[z:z+n_steps]) for z in range(len(x))]) for x in proc_r]
 
+    proc_r = [x*data_config['reward_scaler'] for x in proc_r]
     return proc_r
 
 
 def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fmt='RL', data_config=None):
     if ds_name == "mimic4_hourly":
-        mimic4_hourly_data = pickle.load(open("/mnt/d/research/rl_causal/notebooks/mimic4_hourly_datapackage.pkl", "rb"))
-        obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(mimic4_hourly_data, subsample_frac=subsample_frac)
+        dname = pickle.load(open("/mnt/d/research/rl_causal/notebooks/mimic4_hourly_datapackage.pkl", "rb"))
     elif ds_name == "epicare_len12_acts4ep_10000":
-        epicare_len12_acts4ep_10000 = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_len12_acts4ep_10000.pkl", "rb"))
-        obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(epicare_len12_acts4ep_10000, subsample_frac=subsample_frac)
+        dname = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_len12_acts4ep_10000.pkl", "rb"))
     elif ds_name == "epicare_len72_acts4_vars32_eps25000":
-        epicare_len72_acts4_vars32_eps25000 = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_len72_acts4_vars32_eps25000.pkl", "rb"))
-        obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(epicare_len72_acts4_vars32_eps25000, subsample_frac=subsample_frac)
+        dname = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_len72_acts4_vars32_eps25000.pkl", "rb"))
+    elif ds_name == "epicare_l48_a4_20v_deadcuredonly":
+        dname = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_l48_a4_20v_deadcuredonly.pkl", "rb"))
+    elif ds_name == "epicare_l48_a4_20v_deadcuredonly_LOWBOOST":
+        dname = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_l48_a4_20v_deadcuredonly_LOWBOOST.pkl", "rb"))
     else:
         raise ValueError(f"Dataset {ds_name} not recognized.")
     
+    obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(dname, subsample_frac=subsample_frac)
+
+    #mask states
+    mask_prob = data_config['state_masking_p']
+    obs_masks = [np.random.choice([0, 1], size=x.shape, p=[1-mask_prob, mask_prob]) for x in obs]
+    obs = [x*obs_masks[i] for i,x in enumerate(obs)]
 
     rwds = format_targets(rwds, data_config)
+    #also scale ite's
+    true_ites = [x*data_config['reward_scaler'] for x in true_ites]
 
     train_dataset, val_dataset, test_dataset, seperate_ites = build_train_test_datasets(
         dformat=fmt,

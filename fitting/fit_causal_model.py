@@ -1,4 +1,5 @@
 import csv
+import os
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -15,11 +16,13 @@ def setup_and_run_cs(
             val_dataset,
             test_dataset,
             dataset_name,
+            savetag
         ):
 
     kwargs = {
         'device': train_config.get('device', 'cpu'),
-        'ds_name': dataset_name
+        'ds_name': dataset_name,
+        'savetag': savetag,
     }
     targettype = train_config['targets']
 
@@ -46,6 +49,22 @@ def setup_and_run_cs(
         from fitting.specific_fits.causal_CRN import tarnet_loss
 
         model = TARNet(
+            num_covariates=train_dataset.dataset[0][0].shape[-1],
+            num_treatments=train_dataset.dataset[0][1].shape[-1],
+            num_outputs=train_dataset.dataset[0][2].shape[-1],
+            hidden_units=train_config.get('hidden_units', 64),
+        ).to(train_config.get('device'))
+
+        model_loss_fn = tarnet_loss
+
+        kwargs.update({
+            'hidden_units': train_config.get('hidden_units', 64),
+        })
+    elif method_name == 'SequentialTARNet':
+        from methods.causal_based.SequentialTARNet import SequentialTARNet
+        from fitting.specific_fits.causal_CRN import tarnet_loss
+
+        model = SequentialTARNet(
             num_covariates=train_dataset.dataset[0][0].shape[-1],
             num_treatments=train_dataset.dataset[0][1].shape[-1],
             num_outputs=train_dataset.dataset[0][2].shape[-1],
@@ -101,6 +120,7 @@ def setup_and_run_cs(
         model_forward_fn=model.forward,
         model_loss_fn=model_loss_fn,
         metricsfn_dict=my_metricsfn_dict,
+        targets=targettype,
         **kwargs
     )
 
@@ -160,6 +180,7 @@ def training_loop(model, train_dataloader, val_dataloader, model_forward_fn, mod
             model_forward_fn=model_forward_fn, 
             model_loss_fn=model_loss_fn, 
             metricsfn_dict=metricsfn_dict, 
+            testing_tag='val',
             **kwargs
         )
 
@@ -178,7 +199,7 @@ def training_loop(model, train_dataloader, val_dataloader, model_forward_fn, mod
         }, **validation_results})
 
         train_results = pd.DataFrame(records)
-        train_results.to_csv(f"training_{model.__class__.__name__}_{kwargs['ds_name']}.csv")
+        train_results.to_csv(f"{kwargs['savetag']}_training_{model.__class__.__name__}_{kwargs['ds_name']}.csv")
     return model, train_results
 
 def test_model(model, test_dataloader, model_forward_fn, model_loss_fn, metricsfn_dict, **kwargs):
@@ -191,7 +212,11 @@ def test_model(model, test_dataloader, model_forward_fn, model_loss_fn, metricsf
         testing_tag='test',
         **kwargs
     )
-    test_results = pd.DataFrame([validation_results]).to_csv(f"testing_{model.__class__.__name__}_{kwargs['ds_name']}.csv")
+    f_name = f"{kwargs['savetag']}_testing_{model.__class__.__name__}_{kwargs['ds_name']}.csv"
+    if os.path.exists(f_name):
+        test_results = pd.DataFrame([validation_results]).to_csv(f_name, mode='a', index=False, header=False)
+    else:
+        test_results = pd.DataFrame([validation_results]).to_csv(f_name)
     return test_results
 
 def evaluate_dataset(model, dataloader, model_forward_fn, model_loss_fn, device, metricsfn_dict, **kwargs):

@@ -23,8 +23,10 @@ def tarnet_loss(predictions, true_outcomes, treatments, targets='return', **kwar
     factual_predictions = torch.gather(pred_stack, 2, treatments.argmax(dim=-1).unsqueeze(-1)).squeeze()
     
     if targets == 'return':
-        factual_predictions = factual_predictions.sum(-1)
-    loss_outcome = torch.nn.functional.mse_loss(factual_predictions, true_outcomes.squeeze())
+        factual_preds = factual_predictions.sum(-1)
+    else:
+        factual_preds = factual_predictions
+    loss_outcome = torch.nn.functional.mse_loss(factual_preds, true_outcomes.squeeze())
     return loss_outcome
 
 

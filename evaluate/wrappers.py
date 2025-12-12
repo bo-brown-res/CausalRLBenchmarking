@@ -22,8 +22,9 @@ class ITECalculationWrapper():
                 #note: this gives values which are discounted sum of expected RETURN, not effect of current action
                 # G(t:t+1) = (r_t) + (gamma * r_t+1) + (gamma^2 * E[G(t+2:T)])
                 # G(t:t+2) = (r_t) + (gamma * r_t+1) + (gamma^2 * r_t+1) + (gamma^3 * E[G(t+2:T)])
-                if approach == 'E[G]_temporal_diff':
-                    pair_q_values[:-1] = pair_q_values[:-1] - pair_q_values[1:]
+
+                # if approach == 'E[G]_temporal_diff':
+                #     pair_q_values[:-1] = pair_q_values[:-1] - pair_q_values[1:]
                 
                 episode_taken_a_vals.append(pair_q_values)
             

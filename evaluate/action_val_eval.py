@@ -19,16 +19,16 @@ import torch
 
 def compute_true_ite_error(model, treatments, covariates, true_effects, fmt='cs', **kwargs):
     # actions_taken = treatments
-    val_of_acts_taken = model.predict_treatment_effect(treatments, covariates, **kwargs)
+    pred_val_of_acts_taken = model.predict_treatment_effect(treatments, covariates, **kwargs)
     mask = None
 
     if fmt == 'cs':
         mask = kwargs.get('mask')
-        val_of_acts_taken = val_of_acts_taken.squeeze()
+        pred_val_of_acts_taken = pred_val_of_acts_taken.squeeze()
         taken_acts_idxs = treatments.argmax(dim=-1)
         true_vals_of_acts_taken = torch.gather(true_effects, 2, taken_acts_idxs.unsqueeze(-1)).squeeze(-1)
     elif 'rl_' in fmt:
-        val_of_acts_taken = np.concatenate(val_of_acts_taken)
+        pred_val_of_acts_taken = np.concatenate(pred_val_of_acts_taken)
         if fmt == 'rl_test':
             true_effects = torch.from_numpy(true_effects)
             taken_acts_idxs = torch.from_numpy(np.concatenate([x.actions for x in kwargs['rldataset'].episodes]))
@@ -37,9 +37,19 @@ def compute_true_ite_error(model, treatments, covariates, true_effects, fmt='cs'
         raise NotImplementedError()
     
 
-    diff = (true_vals_of_acts_taken - val_of_acts_taken)**2
+    err_val = (true_vals_of_acts_taken - pred_val_of_acts_taken)**2
     if mask is not None:
-        mse = diff.sum() / mask.sum()
+        err_val = err_val.sum() / mask.sum()
     else:
-        mse = diff.mean()
-    return mse
+        err_val = err_val.mean()
+
+    #cosine_sim
+    # if isinstance(true_vals_of_acts_taken, torch.Tensor):
+    #     true_vals_of_acts_taken = true_vals_of_acts_taken.cpu().numpy()
+    #     val_of_acts_taken = val_of_acts_taken.cpu().numpy()
+    # dot_product = np.vecdot(true_vals_of_acts_taken, val_of_acts_taken, axis=-1)
+    # norm_a = np.linalg.norm(true_vals_of_acts_taken, axis=-1)
+    # norm_b = np.linalg.norm(val_of_acts_taken, axis=-1)
+    # err_val = (dot_product / (norm_a * norm_b)).mean()
+
+    return err_val

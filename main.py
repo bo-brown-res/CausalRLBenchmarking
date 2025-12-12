@@ -18,6 +18,7 @@ import torch
 from dataloading.make_datasets import select_dataset
 from fitting.fit_causal_model import setup_and_run_cs
 from fitting.setup_rl import setup_and_run_rl
+from models.factories import MyCustomEncoderFactory, MyCustomQFunctionFactory
 
 def set_random_seed(seed):
     random.seed(seed)
@@ -39,16 +40,32 @@ def main():
     )
     argparser.add_argument(
         '--targets', type=str, default='mimic4_hourly',
-        help='Name of the dataset to use. Options: mimic4_hourly',
-        choices=['reward', 'return', '1-step-return']
+        help='TODO',
+        # choices=['reward', 'return', '1-step-return']
     )    
     argparser.add_argument(
         '--target_value', type=str, default='mimic4_hourly',
-        help='Name of the dataset to use. Options: mimic4_hourly',
+        help='TODO',
         choices=['binary', 'plusminusone', 'cumulative', 'reals', 'finals', 'final_sum']
     )
+    argparser.add_argument(
+        '--savetag', type=str, default='',
+        help='TODO',
+    )
+    argparser.add_argument(
+        '--reward_scaler', type=float, default=1.0,
+        help='TODO',
+    )
+    argparser.add_argument(
+        '--random_seed', type=int, default=123,
+        help='TODO',
+    )
+    argparser.add_argument(
+        '--state_masking_p', type=float, default=1.0,
+        help='TODO',
+    )
     args = argparser.parse_args()
-    set_random_seed(123)
+    set_random_seed(args.random_seed)
 
     valid_datasets = [
         "mimic4_hourly",
@@ -60,11 +77,14 @@ def main():
         'policy_iteration':  ['RL', None],
         'CausalDQN':        ['RL', None],
         'SoftActorCritic': ['RL', None],
+        'CQL': ['RL', None],
+        'IQL': ['RL', None],
         'DQN': ['RL', None],
         # 'proximal_rl': ['RL', None],
     #causal-based methods
         # 'causal_forest': ['CS', None],
         'TARNet': ['CS', None],
+        'SequentialTARNet': ['CS', None],
         'DragonNet': ['CS', None],
         'CRN': ['CS', None],
         # 'T4': ['CS', None],
@@ -83,12 +103,12 @@ def main():
     train_config = {
         'device': 'cuda:0',
         'batch_size': batch_size,
-        'learning_rate': 1e-3,
+        'learning_rate': 1e-5,
         'discount_factor': 1.0, #0.99,
         'n_critics': 2,
         'alpha': 0.1,
         'mask_size': 10,
-        'n_steps': 100000, #200000, #3000,
+        'n_steps': 20000, #200000, #3000,
         'n_steps_per_epoch': 1000, #1000, #1000,
         'initial_temperature': 0.1,
         'lambda_alpha': 1.0,
@@ -99,17 +119,26 @@ def main():
         'hidden_units': 128,
         'dragon_alpha': 1.0,
         'targets': args.targets,
+        
     }
+    # qfn_fact = MyCustomQFunctionFactory(hdim=128)
+    enc_fact = MyCustomEncoderFactory(feature_size=64, hdim=128)
+    train_config['encoder_factory'] = enc_fact#enc_fact
+    # train_config['q_func_factory'] = None#qfn_fact
+    curdir = "/mnt/d/research/rl_causal/finalproject/outs/"
+    train_config['logdir'] = f"{curdir}{args.method_name}_{args.targets}_{args.target_value}_{args.random_seed}_p={args.state_masking_p}"
 
     data_config ={
         'batch_size': batch_size,
         'max_seq_len': 24*7,
         'targets': args.targets, #'reward', # 'return', '1-step-return'
         'target_value': args.target_value, #'binary' # 'binary', 'plusminusone', 'cumulative', 'reals' 'final'
+        'reward_scaler': args.reward_scaler,
+        'state_masking_p': args.state_masking_p,
     }
     if method_type == 'rl':
         print(f"INFO - We are using RL, so must provide a full trajectory of reward values")
-        data_config['targets'] = 'reward'
+        assert 'reward' in data_config['targets'] or '-step-return' in data_config['targets'], f"ERROR FOR RL: data_config['targets'] = {data_config['targets']} not valid"
 
     #load dataset
     train_dataset, val_dataset, test_dataset,seperate_ites = select_dataset(
@@ -137,7 +166,8 @@ def main():
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             test_dataset=test_dataset,
-            dataset_name=args.dataset_name
+            dataset_name=args.dataset_name,
+            savetag=args.savetag
         )
     else:
         raise ValueError(f"Unknown method type: {method_type}")

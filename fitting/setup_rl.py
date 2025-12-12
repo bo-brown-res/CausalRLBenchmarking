@@ -4,7 +4,7 @@ import numpy as np
 from evaluate.action_val_eval import compute_true_ite_error
 from evaluate.custom_evaluators import TrueValueErrorEvaluator
 from evaluate.wrappers import ITECalculationWrapper
-from fitting.fit_rl import run_SAC, run_CausalDQN, run_DQN
+from fitting.fit_rl import run_CQL, run_SAC, run_CausalDQN, run_DQN
 
 
 def setup_and_run_rl(
@@ -66,6 +66,26 @@ def setup_and_run_rl(
         )
     elif method_name == 'DQN':
         fitted_algo = run_DQN(
+            train_config=train_config,
+            train_dataset=train_dataset,
+            observation_scaler=observation_scaler,
+            reward_scaler=reward_scaler,
+            action_scaler=action_scaler,
+            optim_factory=optim_factory,
+            shared_evalautor_dict=shared_evalautor_dict,
+        )
+    elif method_name == 'CQL':
+        fitted_algo = run_CQL(
+            train_config=train_config,
+            train_dataset=train_dataset,
+            observation_scaler=observation_scaler,
+            reward_scaler=reward_scaler,
+            action_scaler=action_scaler,
+            optim_factory=optim_factory,
+            shared_evalautor_dict=shared_evalautor_dict,
+        )
+    elif method_name == 'IQL':
+        fitted_algo = run_IQL(
             train_config=train_config,
             train_dataset=train_dataset,
             observation_scaler=observation_scaler,
