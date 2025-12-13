@@ -8,6 +8,10 @@ from fitting.fit_causal_model import setup_and_run_cs
 from methods.causal_based.DragonNet import DragonNet
 from methods.causal_based.TARNet import TARNet
 
+
+inspire_model_path = "/mnt/d/research/rl_causal/finalproject/fqe_models/SoftActorCritic_8-step-return_final_sum_123_p=1.0/inspire_model/model_11000.d3"
+mimic_model_path = "/mnt/d/research/rl_causal/finalproject/fqe_models/SoftActorCritic_8-step-return_final_sum_123_p=1.0/mimic_model/model_8000.d3"
+
 class FQENetwork(nn.Module):
     def __init__(self, num_covariates, num_treatments, hidden_units=64):
         super(FQENetwork, self).__init__()
@@ -187,10 +191,10 @@ def run_FQE(modeltype):
     for dsname in ['mimic4_hourly']: #['mimic4_hourly']:
         if dsname == 'inspire_hourly':
             n_epochs = 75
-            rl_model_path = "/mnt/d/research/rl_causal/finalproject/fqe_models/SoftActorCritic_8-step-return_final_sum_123_p=1.0/inspire_model/model_11000.d3"
+            rl_model_path = inspire_model_path
         else:
             n_epochs = 95
-            rl_model_path = "/mnt/d/research/rl_causal/finalproject/fqe_models/SoftActorCritic_8-step-return_final_sum_123_p=1.0/mimic_model/model_8000.d3"
+            rl_model_path = mimic_model_path
 
 
         train_dataset, val_dataset, test_dataset, seperate_ites = select_dataset(

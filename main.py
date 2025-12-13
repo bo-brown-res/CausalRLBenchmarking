@@ -108,7 +108,7 @@ def main():
         'n_critics': 2,
         'alpha': 0.1,
         'mask_size': 10,
-        'n_steps': 20000, #200000, #3000,
+        'n_steps': 10, #200000, #3000,
         'n_steps_per_epoch': 1000, #1000, #1000,
         'initial_temperature': 0.1,
         'lambda_alpha': 1.0,
