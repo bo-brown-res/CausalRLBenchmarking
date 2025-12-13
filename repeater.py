@@ -35,7 +35,7 @@ def run_experiments():
     commands = []
     for m_name in ["DQN", "CQL", "CausalDQN", "SoftActorCritic"]: #"DQN", "CQL", "CausalDQN", "SoftActorCritic"
         for state_masking_p in [1.0, 0.5]:
-            for kstep in [16]:#range(1,1+t):#range(1, 10+1):
+            for kstep in [1, 2, 4, 8, 16]:#range(1,1+t):#range(1, 10+1):
                 # mask_p = px / 10
                 savetag = f"outs_causal_lowboost/{kstep}{targets}_finsun+ret"
 
@@ -62,7 +62,7 @@ def run_experiments():
                     # except KeyboardInterrupt:
                     #     print("\nStopping loop...")
                     #     break\
-    with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=10) as executor:
         results = executor.map(run_command, commands)
 
         # 5. Process results

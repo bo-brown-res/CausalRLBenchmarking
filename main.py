@@ -125,7 +125,7 @@ def main():
     enc_fact = MyCustomEncoderFactory(feature_size=64, hdim=128)
     train_config['encoder_factory'] = enc_fact#enc_fact
     # train_config['q_func_factory'] = None#qfn_fact
-    curdir = "/mnt/d/research/rl_causal/finalproject/outs/"
+    curdir = "/mnt/d/research/rl_causal/finalproject/fqe_models/"
     train_config['logdir'] = f"{curdir}{args.method_name}_{args.targets}_{args.target_value}_{args.random_seed}_p={args.state_masking_p}"
 
     data_config ={

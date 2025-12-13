@@ -22,6 +22,12 @@ def compute_true_ite_error(model, treatments, covariates, true_effects, fmt='cs'
     pred_val_of_acts_taken = model.predict_treatment_effect(treatments, covariates, **kwargs)
     mask = None
 
+    if kwargs.get('for_FQE', False):
+        return torch.tensor([0.0])
+    
+    if 'rl_' in fmt and true_effects is None:
+        return torch.tensor([0.0])
+
     if fmt == 'cs':
         mask = kwargs.get('mask')
         pred_val_of_acts_taken = pred_val_of_acts_taken.squeeze()

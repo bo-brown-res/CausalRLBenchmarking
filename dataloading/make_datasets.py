@@ -80,8 +80,15 @@ def format_targets(rwds, data_config):
 
 
 def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fmt='RL', data_config=None):
+    for_FQE = False
+    mimmc_fix = False
     if ds_name == "mimic4_hourly":
         dname = pickle.load(open("/mnt/d/research/rl_causal/notebooks/mimic4_hourly_datapackage.pkl", "rb"))
+        # for_FQE = True
+        mimmc_fix = True
+    elif ds_name == "inspire_hourly":
+        dname = pickle.load(open("/mnt/d/research/rl_causal/notebooks/INSPIRE_block_actions_J01.pkl", "rb"))
+        for_FQE = True
     elif ds_name == "epicare_len12_acts4ep_10000":
         dname = pickle.load(open("/mnt/d/research/rl_causal/finalproject/data/epicare_len12_acts4ep_10000.pkl", "rb"))
     elif ds_name == "epicare_len72_acts4_vars32_eps25000":
@@ -95,6 +102,11 @@ def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fm
     
     obs, acts, rwds, terms, true_ites, amap, cnames, thhrs = get_data_items(dname, subsample_frac=subsample_frac)
 
+    if for_FQE:
+        acts = [x.argmax(-1)[:, None] for x in acts]
+
+    if all([acts[i].shape[-1] == 1 for i in range(len(acts))]):
+        acts = [x.squeeze(1) for x in acts]
     #mask states
     mask_prob = data_config['state_masking_p']
     obs_masks = [np.random.choice([0, 1], size=x.shape, p=[1-mask_prob, mask_prob]) for x in obs]
@@ -102,7 +114,8 @@ def select_dataset(ds_name, val_size=0.1, test_size=0.2, subsample_frac=None, fm
 
     rwds = format_targets(rwds, data_config)
     #also scale ite's
-    true_ites = [x*data_config['reward_scaler'] for x in true_ites]
+    if true_ites is not None:
+        true_ites = [x*data_config['reward_scaler'] for x in true_ites]
 
     train_dataset, val_dataset, test_dataset, seperate_ites = build_train_test_datasets(
         dformat=fmt,
@@ -141,7 +154,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
             rewards=np.concat([rewards[i] for i in train_indices],axis=0),
             terminals=np.concat([terminals[i] for i in train_indices],axis=0),
         )
-        seperate_ites['train'] = np.concat([true_ites[i] for i in train_indices],axis=0)
+        seperate_ites['train'] = np.concat([true_ites[i] for i in train_indices],axis=0) if true_ites is not None else None
 
         test_dataset = d3rlpy.dataset.MDPDataset(
             observations=np.concat([observations[i] for i in test_indices],axis=0),
@@ -149,7 +162,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
             rewards=np.concat([rewards[i] for i in test_indices],axis=0),
             terminals=np.concat([terminals[i] for i in test_indices],axis=0),
         )
-        seperate_ites['test'] = np.concat([true_ites[i] for i in test_indices],axis=0)
+        seperate_ites['test'] = np.concat([true_ites[i] for i in test_indices],axis=0) if true_ites is not None else None
 
         val_dataset = None
         if validation_size > 0.0:
@@ -159,7 +172,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                 rewards=np.concat([rewards[i] for i in val_indices],axis=0),
                 terminals=np.concat([terminals[i] for i in val_indices],axis=0),
             )
-            seperate_ites['val'] = np.concat([true_ites[i] for i in val_indices],axis=0)
+            seperate_ites['val'] = np.concat([true_ites[i] for i in val_indices],axis=0) if true_ites is not None else None
 
     elif dformat == 'CS':
         max_seq_len = data_config.get('max_seq_len', None)
@@ -174,7 +187,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                                               actions=[torch.from_numpy(actions[i]).to(torch.float32) for i in train_indices],
                                               rewards=[torch.from_numpy(rewards[i]).to(torch.float32) for i in train_indices],
                                               terminals=[torch.from_numpy(terminals[i]).to(torch.float32) for i in train_indices],
-                                              true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in train_indices],
+                                              true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in train_indices] if true_ites is not None else None,
                                               )
         train_dataset = DataLoader(train_vardat, batch_size=data_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
         
@@ -182,7 +195,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                                               actions=[torch.from_numpy(actions[i]).to(torch.float32) for i in test_indices],
                                               rewards=[torch.from_numpy(rewards[i]).to(torch.float32) for i in test_indices],
                                               terminals=[torch.from_numpy(terminals[i]).to(torch.float32) for i in test_indices],
-                                              true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in test_indices],
+                                              true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in test_indices] if true_ites is not None else None,
                                               )
         test_dataset = DataLoader(test_vardat, batch_size=data_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
 
@@ -192,7 +205,7 @@ def build_train_test_datasets(dformat, observations, actions, rewards, terminals
                                                         actions=[torch.from_numpy(actions[i]).to(torch.float32) for i in val_indices],
                                                         rewards=[torch.from_numpy(rewards[i]).to(torch.float32) for i in val_indices],
                                                         terminals=[torch.from_numpy(terminals[i]).to(torch.float32) for i in val_indices],
-                                                        true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in val_indices],
+                                                        true_ites=[torch.from_numpy(true_ites[i]).to(torch.float32) for i in val_indices] if true_ites is not None else None,
                                                         )
             val_dataset = DataLoader(val_vardat, batch_size=data_config.get('batch_size'), collate_fn=pack_collate, shuffle=True)
         

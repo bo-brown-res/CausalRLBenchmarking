@@ -9,7 +9,14 @@ class VariableLengthDataset(Dataset):
         torch_act = torch.nn.utils.rnn.pad_sequence(actions, batch_first=True)
         torch_rwd = torch.nn.utils.rnn.pad_sequence(rewards, batch_first=True)
         torch_trm = torch.nn.utils.rnn.pad_sequence(terminals, batch_first=True)
-        torch_ite = torch.nn.utils.rnn.pad_sequence(true_ites, batch_first=True)
+        self.for_FQE = False
+        
+        if true_ites is not None:
+            torch_ite = torch.nn.utils.rnn.pad_sequence(true_ites, batch_first=True) 
+        else:
+            #override ites with next obs for fqe
+            torch_ite = [x[1:] for x in torch_obs]
+            self.for_FQE = True
 
         lengths = [len(seq) for seq in observations]
         max_len = max(lengths)
@@ -46,7 +53,7 @@ class VariableLengthDataset(Dataset):
         a = self.data[1][idx] #action
         r = self.data[2][idx] #reward
         t = self.data[3][idx] #terminal
-        e = self.data[4][idx] #ites
+        e = self.data[4][idx] #if self.data[4] is not None else None#ites
         m = self.data[5][idx] #masks
         return o, a, r, t, e, m
     
@@ -72,7 +79,7 @@ def pack_collate(batch):
     acts = torch.stack([x[1] for x in batch])
     rwds = torch.stack([x[2] for x in batch])
     term = torch.stack([x[3] for x in batch])
-    ites = torch.stack([x[4] for x in batch])
+    ites = torch.stack([x[4] for x in batch]) #if not all(x[4] is None for x in batch) else 0.0
     masks = torch.stack([x[5] for x in batch])
 
     return obs, acts, rwds, term, ites, masks

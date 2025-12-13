@@ -239,7 +239,7 @@ def evaluate_dataset(model, dataloader, model_forward_fn, model_loss_fn, device,
             covariates = covariates.to(device)
             treatments = treatments.to(device)
             rewards = rewards.to(device)
-            true_ites = true_ites.to(device)
+            true_ites = true_ites.to(device) if true_ites is not None else None
 
             predictions = model_forward_fn(
                 model=model, 
@@ -247,6 +247,7 @@ def evaluate_dataset(model, dataloader, model_forward_fn, model_loss_fn, device,
                 covariates=covariates, 
                 **kwargs
             )
+            kwargs['for_FQE'] = dataloader.dataset.for_FQE
 
             loss = model_loss_fn(predictions, rewards, treatments, **kwargs)
             total_loss += loss.item()
